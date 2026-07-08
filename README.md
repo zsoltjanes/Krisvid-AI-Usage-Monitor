@@ -74,7 +74,7 @@ scripts/
 ## Configuration
 
 - **Language**: gear icon in the panel, or the tray's right-click menu → *Language*. Persisted to `%APPDATA%/ai-usage/settings.json`.
-- **Poll interval**: fixed at 1 minute (`POLL_INTERVAL_MS` in `src/main.js`). On an HTTP 429 from the usage endpoint, the app backs off automatically (respecting `Retry-After` when present, otherwise 5 minutes) instead of retrying every minute.
+- **Poll interval**: fixed at 3 minutes (`POLL_INTERVAL_MS` in `src/main.js`). On an HTTP 429 from the usage endpoint, the app backs off automatically (respecting `Retry-After` when present, otherwise 5 minutes) instead of retrying on schedule.
 
 ## Disclaimer
 
