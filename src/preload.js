@@ -11,10 +11,12 @@ contextBridge.exposeInMainWorld("usageApi", {
   },
   refreshNow: () => ipcRenderer.send("usage:refresh-now"),
   getSnapshot: () => ipcRenderer.invoke("usage:get-snapshot"),
+  getVersion: () => ipcRenderer.invoke("app:get-version"),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setLang: (lang) => ipcRenderer.send("settings:set-lang", lang),
   setPollInterval: (minutes) => ipcRenderer.send("settings:set-poll-interval", minutes),
   minimize: () => ipcRenderer.send("panel:minimize"),
+  openExternal: (url) => ipcRenderer.send("shell:open-external", url),
 });
 
 contextBridge.exposeInMainWorld("i18n", {

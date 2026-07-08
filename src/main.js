@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, Tray, Menu, BrowserWindow, ipcMain, nativeImage, screen } = require("electron");
+const { app, Tray, Menu, BrowserWindow, ipcMain, nativeImage, screen, shell } = require("electron");
 const path = require("path");
 const { fetchLimitUsage } = require("./poller");
 const { LocalUsageStore } = require("./localUsage");
@@ -191,7 +191,7 @@ function setLanguage(lang) {
 function createPanel() {
   const opts = {
     width: 380,
-    height: 700,
+    height: 620,
     show: false,
     frame: false,
     resizable: false,
@@ -295,11 +295,18 @@ app.whenReady().then(() => {
 
   ipcMain.on("usage:refresh-now", () => refreshAll());
   ipcMain.handle("usage:get-snapshot", () => snapshot);
+  ipcMain.handle("app:get-version", () => app.getVersion());
   ipcMain.handle("settings:get", () => currentSettings);
   ipcMain.on("settings:set-lang", (_event, lang) => setLanguage(lang));
   ipcMain.on("settings:set-poll-interval", (_event, minutes) => setPollInterval(minutes));
   ipcMain.on("panel:minimize", () => {
     if (panel && !panel.isDestroyed()) panel.minimize();
+  });
+  ipcMain.on("shell:open-external", (_event, url) => {
+    // Only ever open the app's own known links, never an arbitrary
+    // renderer-supplied URL.
+    const allowed = ["https://janes.hu", "mailto:hello@janes.hu"];
+    if (allowed.includes(url)) shell.openExternal(url);
   });
 
   scheduleNextRefresh();

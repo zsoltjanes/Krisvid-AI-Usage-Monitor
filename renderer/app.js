@@ -4,6 +4,7 @@ let currentLang = "hu";
 let strings = window.i18n.strings(currentLang);
 let latestSnapshot = null;
 let currentPollIntervalMin = 3;
+let appVersion = null;
 
 function pctClass(percent) {
   if (percent == null) return "";
@@ -53,6 +54,7 @@ function applyStaticStrings() {
   document.getElementById("session5hLabel").textContent = strings.session5h;
   document.getElementById("weeklyQuotaLabel").textContent = strings.weeklyQuota;
   document.getElementById("todayLabel").textContent = strings.todayLabel;
+  document.getElementById("costInfoIcon").title = strings.costTooltip;
   document.getElementById("modelsSubtitle").textContent = strings.modelsSubtitle;
   document.getElementById("thModel").textContent = strings.modelHeader;
   document.getElementById("thTokens").textContent = strings.tokensHeader;
@@ -63,6 +65,12 @@ function applyStaticStrings() {
   document.getElementById("intervalLabel").textContent = strings.refreshInterval;
   for (const option of document.getElementById("intervalSelect").options) {
     option.textContent = strings.minutesUnit(option.value);
+  }
+  document.getElementById("aboutBtnLabel").textContent = `ⓘ ${strings.about}`;
+  document.getElementById("aboutCreatedByLabel").textContent = strings.aboutCreatedBy;
+  document.getElementById("aboutBuiltWith").textContent = strings.aboutBuiltWith;
+  if (appVersion) {
+    document.getElementById("aboutVersionLine").textContent = strings.versionLabel(appVersion);
   }
 }
 
@@ -188,6 +196,23 @@ document.getElementById("backBtn").addEventListener("click", closeSettings);
 document.getElementById("minimizeBtn").addEventListener("click", () => window.usageApi.minimize());
 document.getElementById("refreshBtn").addEventListener("click", () => window.usageApi.refreshNow());
 
+document.getElementById("aboutBtn").addEventListener("click", () => {
+  document.getElementById("aboutModal").classList.remove("hidden");
+});
+document.getElementById("aboutCloseBtn").addEventListener("click", () => {
+  document.getElementById("aboutModal").classList.add("hidden");
+});
+document.getElementById("aboutModalBackdrop").addEventListener("click", () => {
+  document.getElementById("aboutModal").classList.add("hidden");
+});
+
+for (const link of document.querySelectorAll(".about-row a[data-url]")) {
+  link.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.usageApi.openExternal(link.dataset.url);
+  });
+}
+
 for (const radio of document.querySelectorAll('input[name="lang"]')) {
   radio.addEventListener("change", (e) => {
     if (!e.target.checked) return;
@@ -229,4 +254,7 @@ window.usageApi.onUpdate((snapshot) => {
   applyStaticStrings();
   const snap = await window.usageApi.getSnapshot();
   if (snap && snap.updatedAt) render(snap);
+
+  appVersion = await window.usageApi.getVersion();
+  document.getElementById("aboutVersionLine").textContent = strings.versionLabel(appVersion);
 })();

@@ -17,11 +17,6 @@
         </div>
       </header>
 
-      <div class="account-block" id="accountBlock">
-        <div class="account-line" id="accountEmailLine" title="">–</div>
-        <div class="account-line hidden" id="accountOrgLine" title=""></div>
-      </div>
-
       <section class="gauges">
         <div class="gauge">
           <div class="gauge-label">
@@ -43,7 +38,10 @@
 
       <section class="today">
         <div class="today-cost" id="todayCost">$0.00</div>
-        <div class="today-label" id="todayLabel">ma elköltve (becslés)</div>
+        <div class="today-label-row">
+          <span class="today-label" id="todayLabel">ma elköltve (becslés)</span>
+          <span class="info-icon" id="costInfoIcon" title="">ⓘ</span>
+        </div>
         <div class="today-tokens" id="todayTokens">0 token</div>
       </section>
 
@@ -63,13 +61,22 @@
         </table>
       </section>
 
+      <div class="account-block" id="accountBlock">
+        <div class="account-line" id="accountEmailLine" title="">–</div>
+        <div class="account-line hidden" id="accountOrgLine" title=""></div>
+      </div>
+
       <footer>
         <span id="statusLine">Betöltés…</span>
       </footer>
 
       <div id="settingsView" class="settings-view hidden">
         <div class="settings-header">
-          <button id="backBtn" title="Back">←</button>
+          <button id="backBtn" title="Back">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="10,3 5,8 10,13" />
+            </svg>
+          </button>
           <span id="settingsTitle">Beállítások</span>
           <span class="spacer"></span>
         </div>
@@ -94,6 +101,28 @@
             <option value="15">15</option>
             <option value="30">30</option>
           </select>
+
+          <button id="aboutBtn" class="about-open-btn" type="button">
+            <span id="aboutBtnLabel">ⓘ Névjegy</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="aboutModal" class="about-modal hidden">
+        <div class="about-modal-backdrop" id="aboutModalBackdrop"></div>
+        <div class="about-modal-box">
+          <div class="about-row">
+            <span id="aboutCreatedByLabel">Készítette</span>: Zsolt Janes
+          </div>
+          <div class="about-row">
+            <a href="#" id="aboutEmailLink" data-url="mailto:hello@janes.hu">hello@janes.hu</a>
+          </div>
+          <div class="about-row">
+            <a href="#" id="aboutWebsiteLink" data-url="https://janes.hu">janes.hu</a>
+          </div>
+          <div class="about-row about-subtle" id="aboutBuiltWith">Claude Code segítségével készült</div>
+          <div class="about-row about-subtle" id="aboutVersionLine">Version: –</div>
+          <button id="aboutCloseBtn" class="about-close-btn" type="button">×</button>
         </div>
       </div>
     </div>

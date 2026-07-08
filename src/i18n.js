@@ -21,6 +21,8 @@ const STRINGS = {
     organizationLabel: "Organization",
     everyNMinutes: (n) => `every ${n} min`,
     todayLabel: "spent today (estimate)",
+    costTooltip:
+      "This is NOT your actual bill. It's a hypothetical cost if this usage were billed at pay-as-you-go API rates. On a flat-fee plan (Pro/Max), your real limit is the session/weekly % gauges above — not this dollar figure.",
     tokenSuffix: "tokens",
     modelsSubtitle: "Based on the last 7 days",
     modelHeader: "Model",
@@ -34,6 +36,10 @@ const STRINGS = {
     trayUnavailable: (err) => `Claude Usage — unavailable (${err})`,
     trayTooltip: (session, weekly) => `Claude Usage\n5h session: ${session}\nWeekly: ${weekly}`,
     trayLoading: "Claude Usage — loading…",
+    about: "About",
+    aboutCreatedBy: "Created by",
+    aboutBuiltWith: "Built with Claude Code",
+    versionLabel: (v) => `Version: ${v}`,
   },
   hu: {
     appTitle: "Claude Code Usage",
@@ -55,6 +61,8 @@ const STRINGS = {
     organizationLabel: "Szervezet",
     everyNMinutes: (n) => `${n} percenként`,
     todayLabel: "ma elköltve (becslés)",
+    costTooltip:
+      "Ez NEM a tényleges számládon szereplő összeg. Egy hipotetikus költség, mintha ezt a használatot API-listaáron (per-token) fizetnéd. Fix havidíjas csomagnál (Pro/Max) a tényleges limited a fenti session/heti % mutatja, nem ez a dollár összeg.",
     tokenSuffix: "token",
     modelsSubtitle: "Utolsó 7 nap alapján",
     modelHeader: "Modell",
@@ -68,6 +76,10 @@ const STRINGS = {
     trayUnavailable: (err) => `Claude Usage — nem elérhető (${err})`,
     trayTooltip: (session, weekly) => `Claude Usage\n5 órás session: ${session}\nHeti: ${weekly}`,
     trayLoading: "Claude Usage — betöltés…",
+    about: "Névjegy",
+    aboutCreatedBy: "Készítette",
+    aboutBuiltWith: "Claude Code segítségével készült",
+    versionLabel: (v) => `Verzió: ${v}`,
   },
 };
 
