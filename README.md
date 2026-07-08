@@ -1,8 +1,10 @@
-# Claude Usage Monitor
+# Claude Code Usage Monitor for Windows
 
 A lightweight Windows tray app that keeps an eye on your [Claude Code](https://claude.com/claude-code) usage — plan limits and local token/cost stats — without having to run `/usage` yourself.
 
 ![platform](https://img.shields.io/badge/platform-Windows-blue) ![node](https://img.shields.io/badge/node-%3E%3D18-green) ![license](https://img.shields.io/badge/license-ISC-lightgrey)
+
+Repo: <https://github.com/zsoltjanes/Claude-Code-Usage-monitor-for-Windows>
 
 ## Features
 
@@ -33,8 +35,8 @@ Download the latest `Claude Usage Monitor Setup *.exe` from [Releases](../../rel
 **Option B — run from source:**
 
 ```sh
-git clone <this-repo>
-cd ai-usage
+git clone https://github.com/zsoltjanes/Claude-Code-Usage-monitor-for-Windows.git
+cd Claude-Code-Usage-monitor-for-Windows
 npm install
 npm start
 ```
