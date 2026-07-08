@@ -1,0 +1,68 @@
+"use strict";
+
+const STRINGS = {
+  en: {
+    appTitle: "Claude Code Usage",
+    refresh: "Refresh now",
+    settings: "Settings",
+    back: "Back",
+    minimize: "Minimize",
+    language: "Language",
+    session5h: "5-hour session",
+    weeklyQuota: "Weekly quota",
+    resetsIn: (h, m) => `resets in ${h}h ${m}m`,
+    resetsInMinutes: (m) => `resets in ${m}m`,
+    resetsInDays: (d) => `resets in ${d}d`,
+    resetsSoon: "resets soon",
+    unavailable: (err) => `unavailable (${err})`,
+    todayLabel: "spent today (estimate)",
+    tokenSuffix: "tokens",
+    modelsSubtitle: "Based on the last 7 days",
+    modelHeader: "Model",
+    tokensHeader: "Tokens",
+    costHeader: "$",
+    loading: "Loading…",
+    updatedAt: (t) => `Updated: ${t}`,
+    startAtLogin: "Start at login",
+    refreshNow: "Refresh now",
+    quit: "Quit",
+    trayUnavailable: (err) => `Claude Usage — unavailable (${err})`,
+    trayTooltip: (session, weekly) => `Claude Usage\n5h session: ${session}\nWeekly: ${weekly}`,
+    trayLoading: "Claude Usage — loading…",
+  },
+  hu: {
+    appTitle: "Claude Code Usage",
+    refresh: "Frissítés most",
+    settings: "Beállítások",
+    back: "Vissza",
+    minimize: "Minimalizálás",
+    language: "Nyelv",
+    session5h: "5 órás session",
+    weeklyQuota: "Heti kvóta",
+    resetsIn: (h, m) => `reset ${h}ó ${m}p múlva`,
+    resetsInMinutes: (m) => `reset ${m}p múlva`,
+    resetsInDays: (d) => `reset ${d} nap múlva`,
+    resetsSoon: "hamarosan resetel",
+    unavailable: (err) => `nem elérhető (${err})`,
+    todayLabel: "ma elköltve (becslés)",
+    tokenSuffix: "token",
+    modelsSubtitle: "Utolsó 7 nap alapján",
+    modelHeader: "Modell",
+    tokensHeader: "Token",
+    costHeader: "$",
+    loading: "Betöltés…",
+    updatedAt: (t) => `Frissítve: ${t}`,
+    startAtLogin: "Indítás bejelentkezéskor",
+    refreshNow: "Frissítés most",
+    quit: "Kilépés",
+    trayUnavailable: (err) => `Claude Usage — nem elérhető (${err})`,
+    trayTooltip: (session, weekly) => `Claude Usage\n5 órás session: ${session}\nHeti: ${weekly}`,
+    trayLoading: "Claude Usage — betöltés…",
+  },
+};
+
+function getStrings(lang) {
+  return STRINGS[lang] || STRINGS.en;
+}
+
+module.exports = { getStrings, SUPPORTED_LANGS: Object.keys(STRINGS) };
