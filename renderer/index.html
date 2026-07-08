@@ -17,6 +17,11 @@
         </div>
       </header>
 
+      <div class="account-block" id="accountBlock">
+        <div class="account-line" id="accountEmailLine" title="">–</div>
+        <div class="account-line hidden" id="accountOrgLine" title=""></div>
+      </div>
+
       <section class="gauges">
         <div class="gauge">
           <div class="gauge-label">
@@ -78,6 +83,17 @@
             <input type="radio" name="lang" value="en" id="langEnRadio" />
             <span>English</span>
           </label>
+
+          <div class="settings-group-label" id="intervalLabel">Frissítési gyakoriság</div>
+          <select id="intervalSelect" class="interval-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="30">30</option>
+          </select>
         </div>
       </div>
     </div>

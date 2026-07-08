@@ -3,6 +3,7 @@
 let currentLang = "hu";
 let strings = window.i18n.strings(currentLang);
 let latestSnapshot = null;
+let currentPollIntervalMin = 3;
 
 function pctClass(percent) {
   if (percent == null) return "";
@@ -59,11 +60,34 @@ function applyStaticStrings() {
   document.getElementById("settingsTitle").textContent = strings.settings;
   document.getElementById("backBtn").title = strings.back;
   document.getElementById("languageLabel").textContent = strings.language;
+  document.getElementById("intervalLabel").textContent = strings.refreshInterval;
+  for (const option of document.getElementById("intervalSelect").options) {
+    option.textContent = strings.minutesUnit(option.value);
+  }
 }
 
 function render(snapshot) {
   latestSnapshot = snapshot;
-  const { limit, local, updatedAt } = snapshot;
+  const { limit, local, account, updatedAt } = snapshot;
+
+  const emailLine = document.getElementById("accountEmailLine");
+  const orgLine = document.getElementById("accountOrgLine");
+  if (account && account.email) {
+    const emailText = `${strings.emailLabel}: ${account.email}`;
+    emailLine.textContent = emailText;
+    emailLine.title = emailText;
+  } else {
+    emailLine.textContent = "–";
+    emailLine.title = "";
+  }
+  if (account && account.organization) {
+    const orgText = `${strings.organizationLabel}: ${account.organization}`;
+    orgLine.textContent = orgText;
+    orgLine.title = orgText;
+    orgLine.classList.remove("hidden");
+  } else {
+    orgLine.classList.add("hidden");
+  }
 
   // limit.session/weekly may carry the last known-good values even when the
   // latest poll failed (see main.js refreshAll) — keep showing them instead
@@ -134,7 +158,7 @@ function render(snapshot) {
   const status = document.getElementById("statusLine");
   if (updatedAt) {
     const t = new Date(updatedAt).toLocaleTimeString(currentLang === "hu" ? "hu-HU" : "en-US");
-    status.textContent = strings.updatedAt(t);
+    status.textContent = `${strings.updatedAt(t)} (${strings.everyNMinutes(currentPollIntervalMin)})`;
   } else {
     status.textContent = strings.loading;
   }
@@ -151,6 +175,7 @@ function setLanguage(lang) {
 function openSettings() {
   document.getElementById("langHuRadio").checked = currentLang === "hu";
   document.getElementById("langEnRadio").checked = currentLang === "en";
+  document.getElementById("intervalSelect").value = String(currentPollIntervalMin);
   document.getElementById("settingsView").classList.remove("hidden");
 }
 
@@ -172,11 +197,22 @@ for (const radio of document.querySelectorAll('input[name="lang"]')) {
   });
 }
 
+document.getElementById("intervalSelect").addEventListener("change", (e) => {
+  const minutes = parseInt(e.target.value, 10);
+  if (!Number.isFinite(minutes)) return;
+  currentPollIntervalMin = minutes;
+  window.usageApi.setPollInterval(minutes);
+  if (latestSnapshot) render(latestSnapshot);
+});
+
 window.usageApi.onUpdate((snapshot) => {
   if (snapshot.settings && snapshot.settings.lang && snapshot.settings.lang !== currentLang) {
     currentLang = snapshot.settings.lang;
     strings = window.i18n.strings(currentLang);
     applyStaticStrings();
+  }
+  if (snapshot.settings && snapshot.settings.pollIntervalMin) {
+    currentPollIntervalMin = snapshot.settings.pollIntervalMin;
   }
   render(snapshot);
 });
@@ -186,6 +222,9 @@ window.usageApi.onUpdate((snapshot) => {
   if (settings && settings.lang) {
     currentLang = settings.lang;
     strings = window.i18n.strings(currentLang);
+  }
+  if (settings && settings.pollIntervalMin) {
+    currentPollIntervalMin = settings.pollIntervalMin;
   }
   applyStaticStrings();
   const snap = await window.usageApi.getSnapshot();

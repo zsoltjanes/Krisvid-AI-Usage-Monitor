@@ -32,6 +32,21 @@ header {
   font-size: 14px;
 }
 
+.account-block {
+  margin-top: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.account-line {
+  font-size: 11px;
+  color: #83858f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -240,6 +255,10 @@ footer {
   letter-spacing: 0.04em;
 }
 
+.settings-group-label:not(:first-child) {
+  margin-top: 20px;
+}
+
 .lang-option {
   display: flex;
   align-items: center;
@@ -254,4 +273,19 @@ footer {
 }
 .lang-option input {
   accent-color: #4a7fd6;
+}
+
+.interval-select {
+  width: 100%;
+  background: #26272e;
+  color: #e6e6ea;
+  border: 1px solid #33343c;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.interval-select:hover {
+  background: #2c2e36;
 }

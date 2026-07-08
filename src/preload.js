@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("usageApi", {
   getSnapshot: () => ipcRenderer.invoke("usage:get-snapshot"),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setLang: (lang) => ipcRenderer.send("settings:set-lang", lang),
+  setPollInterval: (minutes) => ipcRenderer.send("settings:set-poll-interval", minutes),
   minimize: () => ipcRenderer.send("panel:minimize"),
 });
 

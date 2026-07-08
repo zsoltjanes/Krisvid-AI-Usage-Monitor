@@ -4,11 +4,11 @@ const { app, Tray, Menu, BrowserWindow, ipcMain, nativeImage, screen } = require
 const path = require("path");
 const { fetchLimitUsage } = require("./poller");
 const { LocalUsageStore } = require("./localUsage");
-const { loadSettings, saveSettings } = require("./settings");
+const { loadSettings, saveSettings, clampPollIntervalMin, DEFAULT_POLL_INTERVAL_MIN } = require("./settings");
 const { loadWindowState, saveWindowState } = require("./windowState");
 const { getStrings } = require("./i18n");
+const { readAccountInfo } = require("./account");
 
-const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000; // fallback backoff on HTTP 429 without Retry-After
 const MOVE_SAVE_DEBOUNCE_MS = 400;
 
@@ -16,13 +16,19 @@ let tray = null;
 let panel = null;
 const localStore = new LocalUsageStore();
 
-let currentSettings = { lang: "hu" };
+let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN };
 let savedWindowState = null;
 let moveSaveTimer = null;
+let refreshTimerHandle = null;
+
+function getPollIntervalMs() {
+  return clampPollIntervalMin(currentSettings.pollIntervalMin) * 60 * 1000;
+}
 
 let snapshot = {
   limit: { ok: false, error: "not-loaded", session: null, weekly: null },
   local: null,
+  account: null,
   settings: currentSettings,
   updatedAt: null,
 };
@@ -114,6 +120,7 @@ async function refreshAll() {
   } catch {
     // keep previous local snapshot on scan failure
   }
+  snapshot.account = readAccountInfo() || snapshot.account;
   snapshot.updatedAt = new Date().toISOString();
   updateTray();
   pushToRenderer();
@@ -123,16 +130,31 @@ async function refreshAll() {
 function scheduleNextRefresh() {
   refreshAll()
     .then((limit) => {
-      let delay = POLL_INTERVAL_MS;
+      let delay = getPollIntervalMs();
       if (!limit.ok && limit.error === "http-429") {
         const retryMs = limit.retryAfterSec ? limit.retryAfterSec * 1000 : 0;
-        delay = Math.max(POLL_INTERVAL_MS, retryMs, RATE_LIMIT_BACKOFF_MS);
+        delay = Math.max(getPollIntervalMs(), retryMs, RATE_LIMIT_BACKOFF_MS);
       }
-      setTimeout(scheduleNextRefresh, delay);
+      refreshTimerHandle = setTimeout(scheduleNextRefresh, delay);
     })
     .catch(() => {
-      setTimeout(scheduleNextRefresh, POLL_INTERVAL_MS);
+      refreshTimerHandle = setTimeout(scheduleNextRefresh, getPollIntervalMs());
     });
+}
+
+function setPollInterval(minutes) {
+  const clamped = clampPollIntervalMin(minutes);
+  if (clamped === currentSettings.pollIntervalMin) return;
+  currentSettings = { ...currentSettings, pollIntervalMin: clamped };
+  saveSettings(app, currentSettings);
+  snapshot.settings = currentSettings;
+  pushToRenderer();
+  // Re-time the next poll from now using the new interval, without forcing
+  // an immediate extra request (important right after a 429 backoff).
+  if (refreshTimerHandle) {
+    clearTimeout(refreshTimerHandle);
+    refreshTimerHandle = setTimeout(scheduleNextRefresh, getPollIntervalMs());
+  }
 }
 
 function buildContextMenu() {
@@ -146,24 +168,6 @@ function buildContextMenu() {
       click: (item) => {
         app.setLoginItemSettings({ openAtLogin: item.checked });
       },
-    },
-    { type: "separator" },
-    {
-      label: t.language,
-      submenu: [
-        {
-          label: "Magyar",
-          type: "radio",
-          checked: currentSettings.lang === "hu",
-          click: () => setLanguage("hu"),
-        },
-        {
-          label: "English",
-          type: "radio",
-          checked: currentSettings.lang === "en",
-          click: () => setLanguage("en"),
-        },
-      ],
     },
     { type: "separator" },
     { label: t.quit, click: () => app.quit() },
@@ -293,6 +297,7 @@ app.whenReady().then(() => {
   ipcMain.handle("usage:get-snapshot", () => snapshot);
   ipcMain.handle("settings:get", () => currentSettings);
   ipcMain.on("settings:set-lang", (_event, lang) => setLanguage(lang));
+  ipcMain.on("settings:set-poll-interval", (_event, minutes) => setPollInterval(minutes));
   ipcMain.on("panel:minimize", () => {
     if (panel && !panel.isDestroyed()) panel.minimize();
   });
