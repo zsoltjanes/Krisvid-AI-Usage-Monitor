@@ -9,6 +9,14 @@ const { loadWindowState, saveWindowState } = require("./windowState");
 const { getStrings } = require("./i18n");
 const { readAccountInfo } = require("./account");
 
+if (!app.isPackaged) {
+  try {
+    require("electron-reloader")(module, { ignore: ["dist", "build", "scripts"] });
+  } catch {
+    // dev dependency not installed — live reload just stays off
+  }
+}
+
 const RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000; // fallback backoff on HTTP 429 without Retry-After
 const MOVE_SAVE_DEBOUNCE_MS = 400;
 

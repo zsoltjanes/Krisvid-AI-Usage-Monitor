@@ -271,10 +271,12 @@ footer {
   color: #83858f;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  margin-bottom: 12px;
 }
 
 .settings-group-label:not(:first-child) {
-  margin-top: 20px;
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .lang-option {
