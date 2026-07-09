@@ -24,9 +24,10 @@ function loadSettings(app) {
     return {
       lang: parsed.lang === "en" ? "en" : "hu",
       pollIntervalMin: clampPollIntervalMin(parsed.pollIntervalMin ?? DEFAULT_POLL_INTERVAL_MIN),
+      alwaysOnTop: Boolean(parsed.alwaysOnTop),
     };
   } catch {
-    return { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN };
+    return { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false };
   }
 }
 

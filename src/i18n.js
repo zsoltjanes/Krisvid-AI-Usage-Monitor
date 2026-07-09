@@ -40,6 +40,8 @@ const STRINGS = {
     aboutCreatedBy: "Created by",
     aboutBuiltWith: "Built with Claude Code",
     versionLabel: (v) => `Version: ${v}`,
+    windowSection: "Other",
+    alwaysOnTop: "Window always on top",
   },
   hu: {
     appTitle: "Claude Code Usage",
@@ -80,6 +82,8 @@ const STRINGS = {
     aboutCreatedBy: "Készítette",
     aboutBuiltWith: "Claude Code segítségével készült",
     versionLabel: (v) => `Verzió: ${v}`,
+    windowSection: "Egyéb",
+    alwaysOnTop: "Ablak mindig felül",
   },
 };
 

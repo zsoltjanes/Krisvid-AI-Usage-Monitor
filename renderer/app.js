@@ -5,6 +5,7 @@ let strings = window.i18n.strings(currentLang);
 let latestSnapshot = null;
 let currentPollIntervalMin = 3;
 let appVersion = null;
+let alwaysOnTop = false;
 
 function pctClass(percent) {
   if (percent == null) return "";
@@ -66,6 +67,8 @@ function applyStaticStrings() {
   for (const option of document.getElementById("intervalSelect").options) {
     option.textContent = strings.minutesUnit(option.value);
   }
+  document.getElementById("windowLabel").textContent = strings.windowSection;
+  document.getElementById("alwaysOnTopLabel").textContent = strings.alwaysOnTop;
   document.getElementById("aboutBtnLabel").textContent = `ⓘ ${strings.about}`;
   document.getElementById("aboutCreatedByLabel").textContent = strings.aboutCreatedBy;
   document.getElementById("aboutBuiltWith").textContent = strings.aboutBuiltWith;
@@ -172,6 +175,10 @@ function render(snapshot) {
   }
 }
 
+function applyAlwaysOnTop() {
+  document.getElementById("alwaysOnTopCheckbox").checked = alwaysOnTop;
+}
+
 function setLanguage(lang) {
   if (lang === currentLang) return;
   currentLang = lang;
@@ -184,6 +191,7 @@ function openSettings() {
   document.getElementById("langHuRadio").checked = currentLang === "hu";
   document.getElementById("langEnRadio").checked = currentLang === "en";
   document.getElementById("intervalSelect").value = String(currentPollIntervalMin);
+  document.getElementById("alwaysOnTopCheckbox").checked = alwaysOnTop;
   document.getElementById("settingsView").classList.remove("hidden");
 }
 
@@ -194,6 +202,10 @@ function closeSettings() {
 document.getElementById("settingsBtn").addEventListener("click", openSettings);
 document.getElementById("backBtn").addEventListener("click", closeSettings);
 document.getElementById("minimizeBtn").addEventListener("click", () => window.usageApi.minimize());
+document.getElementById("alwaysOnTopCheckbox").addEventListener("change", (e) => {
+  alwaysOnTop = e.target.checked;
+  window.usageApi.setAlwaysOnTop(alwaysOnTop);
+});
 document.getElementById("refreshBtn").addEventListener("click", () => window.usageApi.refreshNow());
 
 document.getElementById("aboutBtn").addEventListener("click", () => {
@@ -239,6 +251,10 @@ window.usageApi.onUpdate((snapshot) => {
   if (snapshot.settings && snapshot.settings.pollIntervalMin) {
     currentPollIntervalMin = snapshot.settings.pollIntervalMin;
   }
+  if (snapshot.settings && typeof snapshot.settings.alwaysOnTop === "boolean" && snapshot.settings.alwaysOnTop !== alwaysOnTop) {
+    alwaysOnTop = snapshot.settings.alwaysOnTop;
+    applyAlwaysOnTop();
+  }
   render(snapshot);
 });
 
@@ -251,7 +267,11 @@ window.usageApi.onUpdate((snapshot) => {
   if (settings && settings.pollIntervalMin) {
     currentPollIntervalMin = settings.pollIntervalMin;
   }
+  if (settings && typeof settings.alwaysOnTop === "boolean") {
+    alwaysOnTop = settings.alwaysOnTop;
+  }
   applyStaticStrings();
+  applyAlwaysOnTop();
   const snap = await window.usageApi.getSnapshot();
   if (snap && snap.updatedAt) render(snap);
 

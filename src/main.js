@@ -24,7 +24,7 @@ let tray = null;
 let panel = null;
 const localStore = new LocalUsageStore();
 
-let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN };
+let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false };
 let savedWindowState = null;
 let moveSaveTimer = null;
 let refreshTimerHandle = null;
@@ -186,6 +186,16 @@ function rebuildTrayMenu() {
   if (tray) tray.setContextMenu(buildContextMenu());
 }
 
+function setAlwaysOnTop(enabled) {
+  const value = Boolean(enabled);
+  if (value === currentSettings.alwaysOnTop) return;
+  currentSettings = { ...currentSettings, alwaysOnTop: value };
+  saveSettings(app, currentSettings);
+  if (panel && !panel.isDestroyed()) panel.setAlwaysOnTop(value);
+  snapshot.settings = currentSettings;
+  pushToRenderer();
+}
+
 function setLanguage(lang) {
   if (lang !== "en" && lang !== "hu") return;
   currentSettings = { ...currentSettings, lang };
@@ -224,6 +234,7 @@ function createPanel() {
     opts.y = savedWindowState.y;
   }
   panel = new BrowserWindow(opts);
+  panel.setAlwaysOnTop(Boolean(currentSettings.alwaysOnTop));
   panel.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
   panel.webContents.on("console-message", (_event, _level, message, line, sourceId) => {
     console.log(`[renderer] ${message} (${sourceId}:${line})`);
@@ -307,6 +318,7 @@ app.whenReady().then(() => {
   ipcMain.handle("settings:get", () => currentSettings);
   ipcMain.on("settings:set-lang", (_event, lang) => setLanguage(lang));
   ipcMain.on("settings:set-poll-interval", (_event, minutes) => setPollInterval(minutes));
+  ipcMain.on("settings:set-always-on-top", (_event, enabled) => setAlwaysOnTop(enabled));
   ipcMain.on("panel:minimize", () => {
     if (panel && !panel.isDestroyed()) panel.minimize();
   });
