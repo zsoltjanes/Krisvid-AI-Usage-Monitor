@@ -6,6 +6,8 @@ Wattsy is a lightweight Windows, macOS, and Linux tray app that monitors AI codi
 
 Repository: <https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor>
 
+![Wattsy application screenshot](resources/screenshot_1.png)
+
 ## Features
 
 - **Multi-provider** — one block per installed tool (Claude Code and OpenAI Codex), each with its own gauges, statistics, and account information.
