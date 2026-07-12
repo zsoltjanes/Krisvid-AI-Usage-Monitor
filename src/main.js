@@ -213,19 +213,24 @@ function setPollInterval(minutes) {
 
 function buildContextMenu() {
   const t = trayStrings();
-  return Menu.buildFromTemplate([
-    { label: t.refreshNow, click: () => refreshAll() },
-    {
+  const items = [{ label: t.refreshNow, click: () => refreshAll() }];
+
+  // Electron's login-item API is available only on macOS and Windows.
+  // Linux desktop environments use their own autostart mechanisms, so don't
+  // expose a menu item that would fail at runtime there.
+  if (process.platform === "darwin" || process.platform === "win32") {
+    items.push({
       label: t.startAtLogin,
       type: "checkbox",
       checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => {
         app.setLoginItemSettings({ openAtLogin: item.checked });
       },
-    },
-    { type: "separator" },
-    { label: t.quit, click: () => app.quit() },
-  ]);
+    });
+  }
+
+  items.push({ type: "separator" }, { label: t.quit, click: () => app.quit() });
+  return Menu.buildFromTemplate(items);
 }
 
 function rebuildTrayMenu() {
