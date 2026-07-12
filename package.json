@@ -1,7 +1,7 @@
 {
   "name": "ai-usage",
   "version": "1.0.0",
-  "description": "Claude Code usage tray monitor",
+  "description": "Wattsy — AI usage tray monitor (Claude Code, OpenAI Codex)",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -14,8 +14,8 @@
   "license": "ISC",
   "type": "commonjs",
   "build": {
-    "appId": "com.claude.usage-monitor",
-    "productName": "Claude Usage Monitor",
+    "appId": "com.janes.wattsy",
+    "productName": "Wattsy",
     "files": [
       "src/**/*",
       "renderer/**/*",

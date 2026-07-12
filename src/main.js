@@ -2,12 +2,10 @@
 
 const { app, Tray, Menu, BrowserWindow, ipcMain, nativeImage, screen, shell } = require("electron");
 const path = require("path");
-const { fetchLimitUsage } = require("./poller");
-const { LocalUsageStore } = require("./localUsage");
+const { PROVIDERS } = require("./providers");
 const { loadSettings, saveSettings, clampPollIntervalMin, DEFAULT_POLL_INTERVAL_MIN } = require("./settings");
 const { loadWindowState, saveWindowState } = require("./windowState");
 const { getStrings } = require("./i18n");
-const { readAccountInfo } = require("./account");
 
 if (!app.isPackaged) {
   try {
@@ -22,9 +20,12 @@ const MOVE_SAVE_DEBOUNCE_MS = 400;
 
 let tray = null;
 let panel = null;
-const localStore = new LocalUsageStore();
+const providerRuntimes = PROVIDERS.map((provider) => ({
+  provider,
+  localStore: provider.createLocalStore(),
+}));
 
-let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false };
+let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
 let savedWindowState = null;
 let moveSaveTimer = null;
 let refreshTimerHandle = null;
@@ -33,10 +34,17 @@ function getPollIntervalMs() {
   return clampPollIntervalMin(currentSettings.pollIntervalMin) * 60 * 1000;
 }
 
+function emptyProviderSnapshot(provider) {
+  return {
+    name: provider.name,
+    limit: { ok: false, error: "not-loaded", session: null, weekly: null },
+    local: null,
+    account: null,
+  };
+}
+
 let snapshot = {
-  limit: { ok: false, error: "not-loaded", session: null, weekly: null },
-  local: null,
-  account: null,
+  providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, emptyProviderSnapshot(p)])),
   settings: currentSettings,
   updatedAt: null,
 };
@@ -90,20 +98,29 @@ function formatPercent(p) {
 
 function buildTooltip() {
   const t = trayStrings();
-  const s = snapshot.limit;
-  if (!s.session && !s.weekly) {
-    return t.trayUnavailable(s.error);
+  const blocks = Object.values(snapshot.providers).map((p) => {
+    const s = p.limit;
+    if (!s.session && !s.weekly) {
+      return `${p.name} — ${t.unavailable(s.error)}`;
+    }
+    const lines = `${p.name}\n${t.session5h}: ${formatPercent(s.session?.percent)}\n${t.weeklyQuota}: ${formatPercent(s.weekly?.percent)}`;
+    return s.ok ? lines : `${lines}\n(${t.unavailable(s.error)})`;
+  });
+  return blocks.join("\n\n") || t.trayLoading;
+}
+
+function worstSessionPercent() {
+  let worst = null;
+  for (const p of Object.values(snapshot.providers)) {
+    const pct = p.limit.session?.percent;
+    if (pct != null && (worst == null || pct > worst)) worst = pct;
   }
-  const sessionPct = formatPercent(s.session?.percent);
-  const weeklyPct = formatPercent(s.weekly?.percent);
-  const tooltip = t.trayTooltip(sessionPct, weeklyPct);
-  return s.ok ? tooltip : `${tooltip}\n(${t.unavailable(s.error)})`;
+  return worst;
 }
 
 function updateTray() {
   if (!tray) return;
-  const percent = snapshot.limit.session?.percent ?? null;
-  tray.setImage(makeTrayIcon(percent));
+  tray.setImage(makeTrayIcon(worstSessionPercent()));
   tray.setToolTip(buildTooltip());
 }
 
@@ -114,34 +131,42 @@ function pushToRenderer() {
 }
 
 async function refreshAll() {
-  const limit = await fetchLimitUsage();
-  if (limit.ok) {
-    snapshot.limit = limit;
-  } else {
-    // A transient failure (rate limit, network blip, momentarily expired
-    // token) shouldn't blank out gauges that already have good data — keep
-    // the last known session/weekly numbers and just surface the error.
-    snapshot.limit = { ...limit, session: snapshot.limit.session, weekly: snapshot.limit.weekly };
-  }
-  try {
-    snapshot.local = localStore.scan();
-  } catch {
-    // keep previous local snapshot on scan failure
-  }
-  snapshot.account = readAccountInfo() || snapshot.account;
+  const limits = await Promise.all(
+    providerRuntimes.map(async ({ provider, localStore }) => {
+      const prev = snapshot.providers[provider.id];
+      const next = { ...prev };
+      const limit = await provider.fetchLimitUsage();
+      // A transient failure (rate limit, network blip, momentarily expired
+      // token) shouldn't blank out gauges that already have good data — keep
+      // the last known session/weekly numbers and just surface the error.
+      next.limit = limit.ok
+        ? limit
+        : { ...limit, session: prev.limit.session, weekly: prev.limit.weekly };
+      try {
+        next.local = localStore.scan();
+      } catch {
+        // keep previous local snapshot on scan failure
+      }
+      next.account = provider.readAccountInfo() || prev.account;
+      snapshot.providers[provider.id] = next;
+      return next.limit;
+    })
+  );
   snapshot.updatedAt = new Date().toISOString();
   updateTray();
   pushToRenderer();
-  return limit;
+  return limits;
 }
 
 function scheduleNextRefresh() {
   refreshAll()
-    .then((limit) => {
+    .then((limits) => {
       let delay = getPollIntervalMs();
-      if (!limit.ok && limit.error === "http-429") {
-        const retryMs = limit.retryAfterSec ? limit.retryAfterSec * 1000 : 0;
-        delay = Math.max(getPollIntervalMs(), retryMs, RATE_LIMIT_BACKOFF_MS);
+      for (const limit of limits) {
+        if (!limit.ok && limit.error === "http-429") {
+          const retryMs = limit.retryAfterSec ? limit.retryAfterSec * 1000 : 0;
+          delay = Math.max(delay, retryMs, RATE_LIMIT_BACKOFF_MS);
+        }
       }
       refreshTimerHandle = setTimeout(scheduleNextRefresh, delay);
     })
@@ -196,6 +221,15 @@ function setAlwaysOnTop(enabled) {
   pushToRenderer();
 }
 
+function setView(view) {
+  const valid = view === "aggregate" || PROVIDERS.some((p) => p.id === view);
+  if (!valid || view === currentSettings.view) return;
+  currentSettings = { ...currentSettings, view };
+  saveSettings(app, currentSettings);
+  snapshot.settings = currentSettings;
+  pushToRenderer();
+}
+
 function setLanguage(lang) {
   if (lang !== "en" && lang !== "hu") return;
   currentSettings = { ...currentSettings, lang };
@@ -209,7 +243,9 @@ function setLanguage(lang) {
 function createPanel() {
   const opts = {
     width: 380,
-    height: 620,
+    // Only one view (a single provider or the combined one) is shown at a
+    // time, so the height no longer depends on how many providers there are.
+    height: 700,
     show: false,
     frame: false,
     resizable: false,
@@ -298,7 +334,7 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(() => {
-  app.setAppUserModelId("com.claude.usage-monitor");
+  app.setAppUserModelId("com.janes.wattsy");
   currentSettings = loadSettings(app);
   savedWindowState = loadWindowState(app);
   snapshot.settings = currentSettings;
@@ -319,6 +355,7 @@ app.whenReady().then(() => {
   ipcMain.on("settings:set-lang", (_event, lang) => setLanguage(lang));
   ipcMain.on("settings:set-poll-interval", (_event, minutes) => setPollInterval(minutes));
   ipcMain.on("settings:set-always-on-top", (_event, enabled) => setAlwaysOnTop(enabled));
+  ipcMain.on("settings:set-view", (_event, view) => setView(view));
   ipcMain.on("panel:minimize", () => {
     if (panel && !panel.isDestroyed()) panel.minimize();
   });

@@ -25,9 +25,10 @@ function loadSettings(app) {
       lang: parsed.lang === "en" ? "en" : "hu",
       pollIntervalMin: clampPollIntervalMin(parsed.pollIntervalMin ?? DEFAULT_POLL_INTERVAL_MIN),
       alwaysOnTop: Boolean(parsed.alwaysOnTop),
+      view: typeof parsed.view === "string" ? parsed.view : "aggregate",
     };
   } catch {
-    return { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false };
+    return { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
   }
 }
 

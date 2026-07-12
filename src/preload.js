@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("usageApi", {
   setLang: (lang) => ipcRenderer.send("settings:set-lang", lang),
   setPollInterval: (minutes) => ipcRenderer.send("settings:set-poll-interval", minutes),
   setAlwaysOnTop: (enabled) => ipcRenderer.send("settings:set-always-on-top", enabled),
+  setView: (view) => ipcRenderer.send("settings:set-view", view),
   minimize: () => ipcRenderer.send("panel:minimize"),
   openExternal: (url) => ipcRenderer.send("shell:open-external", url),
 });

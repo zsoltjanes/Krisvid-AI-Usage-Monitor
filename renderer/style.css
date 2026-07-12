@@ -27,9 +27,43 @@ header {
   cursor: move;
 }
 
+.title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .title {
   font-weight: 600;
   font-size: 14px;
+}
+
+.title-tagline {
+  font-size: 11px;
+  color: #83858f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view-row {
+  display: flex;
+}
+
+.view-select {
+  flex: 1;
+  background: #26272e;
+  color: #e6e6ea;
+  border: 1px solid #33343c;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.view-select:hover {
+  background: #2c2e36;
 }
 
 .account-block {
@@ -46,6 +80,33 @@ header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.providers::-webkit-scrollbar {
+  width: 6px;
+}
+.providers::-webkit-scrollbar-thumb {
+  background: #33343c;
+  border-radius: 3px;
+}
+.providers::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.provider-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .header-actions {
@@ -178,7 +239,7 @@ header {
 }
 
 .models {
-  height: 170px; /* room for a header row + ~4-5 model rows, scrolls beyond that */
+  max-height: 170px; /* room for a header row + ~4-5 model rows, scrolls beyond that */
   overflow-y: auto;
 }
 

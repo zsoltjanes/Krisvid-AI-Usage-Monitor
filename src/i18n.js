@@ -2,7 +2,8 @@
 
 const STRINGS = {
   en: {
-    appTitle: "Claude Code Usage",
+    appTitle: "Wattsy",
+    appTagline: "AI usage monitor",
     refresh: "Refresh now",
     settings: "Settings",
     back: "Back",
@@ -12,6 +13,7 @@ const STRINGS = {
     minutesUnit: (n) => `${n} min`,
     session5h: "5-hour session",
     weeklyQuota: "Weekly quota",
+    combinedView: "Combined",
     resetsIn: (h, m) => `resets in ${h}h ${m}m`,
     resetsInMinutes: (m) => `resets in ${m}m`,
     resetsInDays: (d) => `resets in ${d}d`,
@@ -19,6 +21,7 @@ const STRINGS = {
     unavailable: (err) => `unavailable (${err})`,
     emailLabel: "Email",
     organizationLabel: "Organization",
+    planLabel: "Plan",
     everyNMinutes: (n) => `every ${n} min`,
     todayLabel: "spent today (estimate)",
     costTooltip:
@@ -33,9 +36,7 @@ const STRINGS = {
     startAtLogin: "Start at login",
     refreshNow: "Refresh now",
     quit: "Quit",
-    trayUnavailable: (err) => `Claude Usage — unavailable (${err})`,
-    trayTooltip: (session, weekly) => `Claude Usage\n5h session: ${session}\nWeekly: ${weekly}`,
-    trayLoading: "Claude Usage — loading…",
+    trayLoading: "Wattsy — loading…",
     about: "About",
     aboutCreatedBy: "Created by",
     aboutBuiltWith: "Built with Claude Code",
@@ -44,7 +45,8 @@ const STRINGS = {
     alwaysOnTop: "Window always on top",
   },
   hu: {
-    appTitle: "Claude Code Usage",
+    appTitle: "Wattsy",
+    appTagline: "AI usage monitor",
     refresh: "Frissítés most",
     settings: "Beállítások",
     back: "Vissza",
@@ -54,6 +56,7 @@ const STRINGS = {
     minutesUnit: (n) => `${n} perc`,
     session5h: "5 órás session",
     weeklyQuota: "Heti kvóta",
+    combinedView: "Összesítve",
     resetsIn: (h, m) => `reset ${h}ó ${m}p múlva`,
     resetsInMinutes: (m) => `reset ${m}p múlva`,
     resetsInDays: (d) => `reset ${d} nap múlva`,
@@ -61,6 +64,7 @@ const STRINGS = {
     unavailable: (err) => `nem elérhető (${err})`,
     emailLabel: "Email",
     organizationLabel: "Szervezet",
+    planLabel: "Előfizetés",
     everyNMinutes: (n) => `${n} percenként`,
     todayLabel: "ma elköltve (becslés)",
     costTooltip:
@@ -75,9 +79,7 @@ const STRINGS = {
     startAtLogin: "Indítás bejelentkezéskor",
     refreshNow: "Frissítés most",
     quit: "Kilépés",
-    trayUnavailable: (err) => `Claude Usage — nem elérhető (${err})`,
-    trayTooltip: (session, weekly) => `Claude Usage\n5 órás session: ${session}\nHeti: ${weekly}`,
-    trayLoading: "Claude Usage — betöltés…",
+    trayLoading: "Wattsy — betöltés…",
     about: "Névjegy",
     aboutCreatedBy: "Készítette",
     aboutBuiltWith: "Claude Code segítségével készült",

@@ -3,13 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';" />
-    <title>Claude Usage</title>
+    <title>Wattsy</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="panel">
       <header>
-        <span class="title" id="appTitle">Claude Code Usage</span>
+        <div class="title-wrap">
+          <span class="title" id="appTitle">Wattsy</span>
+          <span class="title-tagline" id="appTagline">AI usage monitor</span>
+        </div>
         <div class="header-actions">
           <button id="minimizeBtn" title="Minimize">–</button>
           <button id="settingsBtn" title="Settings">⚙</button>
@@ -17,54 +20,11 @@
         </div>
       </header>
 
-      <section class="gauges">
-        <div class="gauge">
-          <div class="gauge-label">
-            <span id="session5hLabel">5 órás session</span>
-            <span id="sessionPct">–</span>
-          </div>
-          <div class="bar"><div id="sessionBar" class="bar-fill"></div></div>
-          <div class="gauge-sub" id="sessionReset">–</div>
-        </div>
-        <div class="gauge">
-          <div class="gauge-label">
-            <span id="weeklyQuotaLabel">Heti kvóta</span>
-            <span id="weeklyPct">–</span>
-          </div>
-          <div class="bar"><div id="weeklyBar" class="bar-fill"></div></div>
-          <div class="gauge-sub" id="weeklyReset">–</div>
-        </div>
-      </section>
-
-      <section class="today">
-        <div class="today-cost" id="todayCost">$0.00</div>
-        <div class="today-label-row">
-          <span class="today-label" id="todayLabel">ma elköltve (becslés)</span>
-          <span class="info-icon" id="costInfoIcon" title="">ⓘ</span>
-        </div>
-        <div class="today-tokens" id="todayTokens">0 token</div>
-      </section>
-
-      <section class="chart" id="chart"></section>
-
-      <section class="models">
-        <div class="models-subtitle" id="modelsSubtitle">Utolsó 7 nap alapján</div>
-        <table>
-          <thead>
-            <tr>
-              <th id="thModel">Modell</th>
-              <th id="thTokens">Token</th>
-              <th id="thCost">$</th>
-            </tr>
-          </thead>
-          <tbody id="modelRows"></tbody>
-        </table>
-      </section>
-
-      <div class="account-block" id="accountBlock">
-        <div class="account-line" id="accountEmailLine" title="">–</div>
-        <div class="account-line hidden" id="accountOrgLine" title=""></div>
+      <div class="view-row">
+        <select id="viewSelect" class="view-select"></select>
       </div>
+
+      <div id="providers" class="providers"></div>
 
       <footer>
         <span id="statusLine">Betöltés…</span>

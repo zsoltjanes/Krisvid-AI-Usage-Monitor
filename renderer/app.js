@@ -6,6 +6,7 @@ let latestSnapshot = null;
 let currentPollIntervalMin = 3;
 let appVersion = null;
 let alwaysOnTop = false;
+let currentView = "aggregate"; // "aggregate" | provider id
 
 function pctClass(percent) {
   if (percent == null) return "";
@@ -46,20 +47,251 @@ function fmtTokens(n) {
   return `${n} ${strings.tokenSuffix}`;
 }
 
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function makeGauge(label) {
+  const root = el("div", "gauge");
+  const labelRow = el("div", "gauge-label");
+  labelRow.appendChild(el("span", null, label));
+  const pct = el("span", null, "–");
+  labelRow.appendChild(pct);
+  const barWrap = el("div", "bar");
+  const bar = el("div", "bar-fill");
+  barWrap.appendChild(bar);
+  const sub = el("div", "gauge-sub", "–");
+  root.append(labelRow, barWrap, sub);
+  return { root, pct, bar, sub };
+}
+
+function accountLines(account) {
+  if (!account) return [];
+  const lines = [];
+  if (account.email) lines.push(`${strings.emailLabel}: ${account.email}`);
+  if (account.organization) lines.push(`${strings.organizationLabel}: ${account.organization}`);
+  if (account.plan) lines.push(`${strings.planLabel}: ${account.plan}`);
+  return lines;
+}
+
+function makeAccountBlock(account) {
+  const block = el("div", "account-block");
+  for (const line of accountLines(account)) {
+    const div = el("div", "account-line", line);
+    div.title = line;
+    block.appendChild(div);
+  }
+  return block;
+}
+
+function makeTodaySection(costUsd, tokens) {
+  const today = el("section", "today");
+  const cost = el("div", "today-cost", fmtUsd(costUsd));
+  const labelRow = el("div", "today-label-row");
+  labelRow.appendChild(el("span", "today-label", strings.todayLabel));
+  const info = el("span", "info-icon", "ⓘ");
+  info.title = strings.costTooltip;
+  labelRow.appendChild(info);
+  today.append(cost, labelRow, el("div", "today-tokens", fmtTokens(tokens)));
+  return today;
+}
+
+function buildChart(days) {
+  const chart = el("section", "chart");
+  const maxCost = Math.max(0.01, ...days.map((d) => d.costUsd));
+  for (const d of days) {
+    const wrap = el("div", "chart-bar-wrap");
+    const bar = el("div", "chart-bar");
+    const pct = Math.max(2, Math.round((d.costUsd / maxCost) * 100));
+    bar.style.height = `${pct}%`;
+    bar.title = `${d.date}: ${fmtUsd(d.costUsd)}`;
+    const label = el("div", "chart-day", d.date.slice(5)); // MM-DD
+    wrap.append(bar, label);
+    chart.appendChild(wrap);
+  }
+  return chart;
+}
+
+function buildModelsTable(byModel) {
+  const models = el("section", "models");
+  models.appendChild(el("div", "models-subtitle", strings.modelsSubtitle));
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headRow.append(
+    el("th", null, strings.modelHeader),
+    el("th", null, strings.tokensHeader),
+    el("th", null, strings.costHeader)
+  );
+  thead.appendChild(headRow);
+  const tbody = document.createElement("tbody");
+  // Skip rows with no usage at all — e.g. Claude Code's "<synthetic>"
+  // placeholder entries for locally generated (non-API) messages.
+  const sortedModels = [...byModel]
+    .filter((m) => m.tokens > 0 || m.costUsd > 0)
+    .sort((a, b) => b.costUsd - a.costUsd);
+  for (const m of sortedModels) {
+    const tr = document.createElement("tr");
+    tr.append(el("td", null, m.model), el("td", null, fmtTokens(m.tokens)), el("td", null, fmtUsd(m.costUsd)));
+    tbody.appendChild(tr);
+  }
+  table.append(thead, tbody);
+  models.appendChild(table);
+  return models;
+}
+
+/** Single-provider view: full gauges + that provider's own stats. */
+function renderProviderBlock(data) {
+  const { limit, local, account } = data;
+  const root = el("section", "provider-block");
+  // No title row — the view select right above already names the provider;
+  // the account info sits at the bottom, above the status line.
+
+  // limit.session/weekly may carry the last known-good values even when the
+  // latest poll failed (see main.js refreshAll) — keep showing them instead
+  // of blanking the gauge, and just note the error alongside. "not-loaded"
+  // is the pre-first-poll placeholder, not an error worth showing.
+  const session = limit?.session ?? null;
+  const weekly = limit?.weekly ?? null;
+  const isError = limit && !limit.ok && limit.error !== "not-loaded";
+  const errNote = isError ? ` · ${strings.unavailable(limit.error)}` : "";
+
+  const gauges = el("section", "gauges");
+  const sessionGauge = makeGauge(strings.session5h);
+  sessionGauge.pct.textContent = fmtPct(session?.percent);
+  sessionGauge.bar.style.width = `${Math.min(100, session?.percent ?? 0)}%`;
+  sessionGauge.bar.className = `bar-fill ${pctClass(session?.percent)}`;
+  sessionGauge.sub.textContent = session
+    ? `${fmtReset(session.resetsAt)}${errNote}`
+    : isError
+      ? strings.unavailable(limit.error)
+      : "–";
+
+  const weeklyGauge = makeGauge(strings.weeklyQuota);
+  weeklyGauge.pct.textContent = fmtPct(weekly?.percent);
+  weeklyGauge.bar.style.width = `${Math.min(100, weekly?.percent ?? 0)}%`;
+  weeklyGauge.bar.className = `bar-fill ${pctClass(weekly?.percent)}`;
+  weeklyGauge.sub.textContent = weekly ? `${fmtReset(weekly.resetsAt)}${errNote}` : "–";
+
+  gauges.append(sessionGauge.root, weeklyGauge.root);
+  root.appendChild(gauges);
+
+  root.appendChild(makeTodaySection(local ? local.today.costUsd : 0, local ? local.today.tokens : 0));
+  root.appendChild(buildChart(local ? local.last7Days : []));
+  root.appendChild(buildModelsTable(local ? local.byModel : []));
+  root.appendChild(makeAccountBlock(account));
+  return root;
+}
+
+/**
+ * Combined view: one compact gauge per provider (limit percentages can't be
+ * merged meaningfully) + cost/tokens/chart/models summed across providers.
+ */
+function renderAggregate(providers, ids) {
+  const root = el("section", "provider-block");
+  // No title row — the view select right above already names this view.
+  const gauges = el("section", "gauges");
+  for (const id of ids) {
+    const p = providers[id];
+    const limit = p.limit || {};
+    const session = limit.session ?? null;
+    const weekly = limit.weekly ?? null;
+    const gauge = makeGauge(p.name);
+    gauge.pct.textContent = fmtPct(session?.percent);
+    gauge.bar.style.width = `${Math.min(100, session?.percent ?? 0)}%`;
+    gauge.bar.className = `bar-fill ${pctClass(session?.percent)}`;
+    const isError = limit && !limit.ok && limit.error !== "not-loaded";
+    const parts = [];
+    if (session) parts.push(`${strings.session5h}: ${fmtReset(session.resetsAt) || fmtPct(session.percent)}`);
+    if (weekly) parts.push(`${strings.weeklyQuota}: ${fmtPct(weekly.percent)}`);
+    if (isError) parts.push(strings.unavailable(limit.error));
+    gauge.sub.textContent = parts.length > 0 ? parts.join(" · ") : "–";
+    gauges.appendChild(gauge.root);
+  }
+  root.appendChild(gauges);
+
+  let todayCost = 0;
+  let todayTokens = 0;
+  const byDay = new Map(); // date -> costUsd
+  const byModel = [];
+  for (const id of ids) {
+    const local = providers[id].local;
+    if (!local) continue;
+    todayCost += local.today.costUsd || 0;
+    todayTokens += local.today.tokens || 0;
+    for (const d of local.last7Days) {
+      byDay.set(d.date, (byDay.get(d.date) || 0) + d.costUsd);
+    }
+    byModel.push(...local.byModel);
+  }
+
+  root.appendChild(makeTodaySection(todayCost, todayTokens));
+  const chartDays = [...byDay.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([date, costUsd]) => ({ date, costUsd }));
+  root.appendChild(buildChart(chartDays));
+  root.appendChild(buildModelsTable(byModel));
+  return root;
+}
+
+function updateViewSelect(providers, ids) {
+  const row = document.querySelector(".view-row");
+  const select = document.getElementById("viewSelect");
+  if (ids.length < 2) {
+    row.classList.add("hidden");
+    return;
+  }
+  row.classList.remove("hidden");
+  select.innerHTML = "";
+  const aggregateOpt = el("option", null, strings.combinedView);
+  aggregateOpt.value = "aggregate";
+  select.appendChild(aggregateOpt);
+  for (const id of ids) {
+    const opt = el("option", null, providers[id].name);
+    opt.value = id;
+    select.appendChild(opt);
+  }
+  select.value = currentView !== "aggregate" && !providers[currentView] ? "aggregate" : currentView;
+}
+
+function render(snapshot) {
+  latestSnapshot = snapshot;
+  const container = document.getElementById("providers");
+  const providers = snapshot.providers || {};
+  const ids = Object.keys(providers);
+
+  updateViewSelect(providers, ids);
+
+  let view = currentView;
+  if (view !== "aggregate" && !providers[view]) view = "aggregate";
+  if (ids.length === 1) view = ids[0]; // nothing to combine
+
+  container.innerHTML = "";
+  if (view === "aggregate") {
+    container.appendChild(renderAggregate(providers, ids));
+  } else {
+    container.appendChild(renderProviderBlock(providers[view]));
+  }
+
+  const status = document.getElementById("statusLine");
+  if (snapshot.updatedAt) {
+    const t = new Date(snapshot.updatedAt).toLocaleTimeString(currentLang === "hu" ? "hu-HU" : "en-US");
+    status.textContent = `${strings.updatedAt(t)} (${strings.everyNMinutes(currentPollIntervalMin)})`;
+  } else {
+    status.textContent = strings.loading;
+  }
+}
+
 function applyStaticStrings() {
-  document.title = strings.appTitle;
+  document.title = `${strings.appTitle} — ${strings.appTagline}`;
   document.getElementById("appTitle").textContent = strings.appTitle;
+  document.getElementById("appTagline").textContent = strings.appTagline;
   document.getElementById("minimizeBtn").title = strings.minimize;
   document.getElementById("settingsBtn").title = strings.settings;
   document.getElementById("refreshBtn").title = strings.refresh;
-  document.getElementById("session5hLabel").textContent = strings.session5h;
-  document.getElementById("weeklyQuotaLabel").textContent = strings.weeklyQuota;
-  document.getElementById("todayLabel").textContent = strings.todayLabel;
-  document.getElementById("costInfoIcon").title = strings.costTooltip;
-  document.getElementById("modelsSubtitle").textContent = strings.modelsSubtitle;
-  document.getElementById("thModel").textContent = strings.modelHeader;
-  document.getElementById("thTokens").textContent = strings.tokensHeader;
-  document.getElementById("thCost").textContent = strings.costHeader;
   document.getElementById("settingsTitle").textContent = strings.settings;
   document.getElementById("backBtn").title = strings.back;
   document.getElementById("languageLabel").textContent = strings.language;
@@ -75,104 +307,8 @@ function applyStaticStrings() {
   if (appVersion) {
     document.getElementById("aboutVersionLine").textContent = strings.versionLabel(appVersion);
   }
-}
-
-function render(snapshot) {
-  latestSnapshot = snapshot;
-  const { limit, local, account, updatedAt } = snapshot;
-
-  const emailLine = document.getElementById("accountEmailLine");
-  const orgLine = document.getElementById("accountOrgLine");
-  if (account && account.email) {
-    const emailText = `${strings.emailLabel}: ${account.email}`;
-    emailLine.textContent = emailText;
-    emailLine.title = emailText;
-  } else {
-    emailLine.textContent = "–";
-    emailLine.title = "";
-  }
-  if (account && account.organization) {
-    const orgText = `${strings.organizationLabel}: ${account.organization}`;
-    orgLine.textContent = orgText;
-    orgLine.title = orgText;
-    orgLine.classList.remove("hidden");
-  } else {
-    orgLine.classList.add("hidden");
-  }
-
-  // limit.session/weekly may carry the last known-good values even when the
-  // latest poll failed (see main.js refreshAll) — keep showing them instead
-  // of blanking the gauge, and just note the error alongside.
-  const session = limit?.session ?? null;
-  const weekly = limit?.weekly ?? null;
-  const errNote = limit && !limit.ok ? ` · ${strings.unavailable(limit.error)}` : "";
-
-  document.getElementById("sessionPct").textContent = fmtPct(session?.percent);
-  const sessionBar = document.getElementById("sessionBar");
-  sessionBar.style.width = `${Math.min(100, session?.percent ?? 0)}%`;
-  sessionBar.className = `bar-fill ${pctClass(session?.percent)}`;
-  document.getElementById("sessionReset").textContent = session
-    ? `${fmtReset(session.resetsAt)}${errNote}`
-    : limit && !limit.ok
-      ? strings.unavailable(limit.error)
-      : "–";
-
-  document.getElementById("weeklyPct").textContent = fmtPct(weekly?.percent);
-  const weeklyBar = document.getElementById("weeklyBar");
-  weeklyBar.style.width = `${Math.min(100, weekly?.percent ?? 0)}%`;
-  weeklyBar.className = `bar-fill ${pctClass(weekly?.percent)}`;
-  document.getElementById("weeklyReset").textContent = weekly
-    ? `${fmtReset(weekly.resetsAt)}${errNote}`
-    : "–";
-
-  if (local) {
-    document.getElementById("todayCost").textContent = fmtUsd(local.today.costUsd);
-    document.getElementById("todayTokens").textContent = fmtTokens(local.today.tokens);
-
-    const chart = document.getElementById("chart");
-    chart.innerHTML = "";
-    const maxCost = Math.max(0.01, ...local.last7Days.map((d) => d.costUsd));
-    for (const d of local.last7Days) {
-      const wrap = document.createElement("div");
-      wrap.className = "chart-bar-wrap";
-      const bar = document.createElement("div");
-      bar.className = "chart-bar";
-      const pct = Math.max(2, Math.round((d.costUsd / maxCost) * 100));
-      bar.style.height = `${pct}%`;
-      bar.title = `${d.date}: ${fmtUsd(d.costUsd)}`;
-      const label = document.createElement("div");
-      label.className = "chart-day";
-      label.textContent = d.date.slice(5); // MM-DD
-      wrap.appendChild(bar);
-      wrap.appendChild(label);
-      chart.appendChild(wrap);
-    }
-
-    const rows = document.getElementById("modelRows");
-    rows.innerHTML = "";
-    const sortedModels = [...local.byModel].sort((a, b) => b.costUsd - a.costUsd);
-    for (const m of sortedModels) {
-      const tr = document.createElement("tr");
-      const tdModel = document.createElement("td");
-      tdModel.textContent = m.model;
-      const tdTokens = document.createElement("td");
-      tdTokens.textContent = fmtTokens(m.tokens);
-      const tdCost = document.createElement("td");
-      tdCost.textContent = fmtUsd(m.costUsd);
-      tr.appendChild(tdModel);
-      tr.appendChild(tdTokens);
-      tr.appendChild(tdCost);
-      rows.appendChild(tr);
-    }
-  }
-
-  const status = document.getElementById("statusLine");
-  if (updatedAt) {
-    const t = new Date(updatedAt).toLocaleTimeString(currentLang === "hu" ? "hu-HU" : "en-US");
-    status.textContent = `${strings.updatedAt(t)} (${strings.everyNMinutes(currentPollIntervalMin)})`;
-  } else {
-    status.textContent = strings.loading;
-  }
+  // The provider view carries its own labels — re-render in the new language.
+  if (latestSnapshot) render(latestSnapshot);
 }
 
 function applyAlwaysOnTop() {
@@ -184,7 +320,6 @@ function setLanguage(lang) {
   currentLang = lang;
   strings = window.i18n.strings(lang);
   applyStaticStrings();
-  if (latestSnapshot) render(latestSnapshot);
 }
 
 function openSettings() {
@@ -207,6 +342,12 @@ document.getElementById("alwaysOnTopCheckbox").addEventListener("change", (e) =>
   window.usageApi.setAlwaysOnTop(alwaysOnTop);
 });
 document.getElementById("refreshBtn").addEventListener("click", () => window.usageApi.refreshNow());
+
+document.getElementById("viewSelect").addEventListener("change", (e) => {
+  currentView = e.target.value;
+  window.usageApi.setView(currentView);
+  if (latestSnapshot) render(latestSnapshot);
+});
 
 document.getElementById("aboutBtn").addEventListener("click", () => {
   document.getElementById("aboutModal").classList.remove("hidden");
@@ -242,38 +383,41 @@ document.getElementById("intervalSelect").addEventListener("change", (e) => {
   if (latestSnapshot) render(latestSnapshot);
 });
 
-window.usageApi.onUpdate((snapshot) => {
-  if (snapshot.settings && snapshot.settings.lang && snapshot.settings.lang !== currentLang) {
-    currentLang = snapshot.settings.lang;
+function syncSettings(settings) {
+  if (!settings) return false;
+  let langChanged = false;
+  if (settings.lang && settings.lang !== currentLang) {
+    currentLang = settings.lang;
     strings = window.i18n.strings(currentLang);
-    applyStaticStrings();
+    langChanged = true;
   }
-  if (snapshot.settings && snapshot.settings.pollIntervalMin) {
-    currentPollIntervalMin = snapshot.settings.pollIntervalMin;
+  if (settings.pollIntervalMin) {
+    currentPollIntervalMin = settings.pollIntervalMin;
   }
-  if (snapshot.settings && typeof snapshot.settings.alwaysOnTop === "boolean" && snapshot.settings.alwaysOnTop !== alwaysOnTop) {
-    alwaysOnTop = snapshot.settings.alwaysOnTop;
+  if (typeof settings.alwaysOnTop === "boolean" && settings.alwaysOnTop !== alwaysOnTop) {
+    alwaysOnTop = settings.alwaysOnTop;
     applyAlwaysOnTop();
+  }
+  if (typeof settings.view === "string") {
+    currentView = settings.view;
+  }
+  return langChanged;
+}
+
+window.usageApi.onUpdate((snapshot) => {
+  if (syncSettings(snapshot.settings)) {
+    applyStaticStrings();
   }
   render(snapshot);
 });
 
 (async () => {
   const settings = await window.usageApi.getSettings();
-  if (settings && settings.lang) {
-    currentLang = settings.lang;
-    strings = window.i18n.strings(currentLang);
-  }
-  if (settings && settings.pollIntervalMin) {
-    currentPollIntervalMin = settings.pollIntervalMin;
-  }
-  if (settings && typeof settings.alwaysOnTop === "boolean") {
-    alwaysOnTop = settings.alwaysOnTop;
-  }
+  syncSettings(settings);
   applyStaticStrings();
   applyAlwaysOnTop();
   const snap = await window.usageApi.getSnapshot();
-  if (snap && snap.updatedAt) render(snap);
+  if (snap) render(snap);
 
   appVersion = await window.usageApi.getVersion();
   document.getElementById("aboutVersionLine").textContent = strings.versionLabel(appVersion);
