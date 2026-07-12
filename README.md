@@ -4,7 +4,7 @@ Wattsy is a lightweight Windows, macOS, and Linux tray app that monitors AI codi
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue) ![node](https://img.shields.io/badge/node-%3E%3D18-green) ![license](https://img.shields.io/badge/license-ISC-lightgrey)
 
-Repository: <https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor-for-Windows>
+Repository: <https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor>
 
 ## Features
 
@@ -44,8 +44,8 @@ Download the matching artifact from [Releases](../../releases):
 Alternatively, run it from source on any supported operating system:
 
 ```sh
-git clone https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor-for-Windows.git
-cd Wattsy-AI-Usage-Monitor-for-Windows
+git clone https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor.git
+cd Wattsy-AI-Usage-Monitor
 npm install
 npm start
 ```
