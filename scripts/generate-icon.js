@@ -10,6 +10,11 @@ const zlib = require("zlib");
 
 const LOGO_PATH = path.join(__dirname, "..", "resources", "logo.png");
 const ICO_SIZES = [256, 64, 48, 32, 16];
+const LINUX_SIZES = [16, 32, 48, 64, 128, 256, 512];
+const ICNS_TYPES = new Map([
+  [16, "icp4"], [32, "icp5"], [64, "icp6"], [128, "ic07"],
+  [256, "ic08"], [512, "ic09"], [1024, "ic10"],
+]);
 
 function crc32(buf) {
   if (typeof zlib.crc32 === "function") return zlib.crc32(buf) >>> 0;
@@ -199,6 +204,19 @@ function buildIco(images) {
   return Buffer.concat([header, ...entries, ...images.map((i) => i.png)]);
 }
 
+function buildIcns(images) {
+  const elements = images.map((img) => {
+    const header = Buffer.alloc(8);
+    header.write(img.type, 0, 4, "ascii");
+    header.writeUInt32BE(img.png.length + 8, 4);
+    return Buffer.concat([header, img.png]);
+  });
+  const header = Buffer.alloc(8);
+  header.write("icns", 0, 4, "ascii");
+  header.writeUInt32BE(8 + elements.reduce((size, element) => size + element.length, 0), 4);
+  return Buffer.concat([header, ...elements]);
+}
+
 const logo = decodePng(fs.readFileSync(LOGO_PATH));
 const images = ICO_SIZES.map((size) => ({
   size,
@@ -209,4 +227,17 @@ const ico = buildIco(images);
 const outDir = path.join(__dirname, "..", "build");
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "icon.ico"), ico);
-console.log(`Wrote ${path.join(outDir, "icon.ico")} (${ico.length} bytes, sizes: ${ICO_SIZES.join("/")})`);
+const icnsImages = [...ICNS_TYPES].map(([size, type]) => ({
+  type,
+  png: encodePng(downscale(logo.rgba, logo.width, logo.height, size), size),
+}));
+const icns = buildIcns(icnsImages);
+fs.writeFileSync(path.join(outDir, "icon.icns"), icns);
+
+const linuxDir = path.join(outDir, "icons");
+fs.mkdirSync(linuxDir, { recursive: true });
+for (const size of LINUX_SIZES) {
+  fs.writeFileSync(path.join(linuxDir, `${size}x${size}.png`), encodePng(downscale(logo.rgba, logo.width, logo.height, size), size));
+}
+
+console.log(`Wrote platform icons to ${outDir} (Windows ICO, macOS ICNS, Linux PNGs)`);
