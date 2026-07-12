@@ -1,12 +1,15 @@
 "use strict";
 
-// Generates build/icon.ico — a single 256x256 PNG-in-ICO image (Vista+ format).
-// No image-processing dependency needed: hand-rolled PNG encoder using core zlib.
+// Generates build/icon.ico from resources/logo.png — a multi-size PNG-in-ICO
+// (Vista+ format) with 256/64/48/32/16 px entries, used by the installer and
+// the packaged exe. No image-processing dependency needed: hand-rolled PNG
+// decoder/encoder using core zlib.
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-const SIZE = 256;
+const LOGO_PATH = path.join(__dirname, "..", "resources", "logo.png");
+const ICO_SIZES = [256, 64, 48, 32, 16];
 
 function crc32(buf) {
   if (typeof zlib.crc32 === "function") return zlib.crc32(buf) >>> 0;
@@ -38,38 +41,112 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crc]);
 }
 
-function drawPixels(size) {
-  // RGBA buffer: a filled circle badge — teal/green disc on transparent bg,
-  // matching the tray icon's "normal" severity color, with a lighter ring.
-  const buf = Buffer.alloc(size * size * 4);
-  const cx = size / 2 - 0.5;
-  const cy = size / 2 - 0.5;
-  const radius = size / 2 - size * 0.06;
-  const ringWidth = size * 0.05;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4;
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist <= radius) {
-        const inRing = dist >= radius - ringWidth;
-        if (inRing) {
-          buf[idx] = 92; // R
-          buf[idx + 1] = 200;
-          buf[idx + 2] = 150;
-        } else {
-          buf[idx] = 70;
-          buf[idx + 1] = 170;
-          buf[idx + 2] = 90;
+/**
+ * Minimal PNG decoder: 8-bit RGB/RGBA, non-interlaced (what design tools
+ * export). Returns { rgba, width, height }.
+ */
+function decodePng(buf) {
+  if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error("not a PNG file");
+  let pos = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat = [];
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos);
+    const type = buf.toString("ascii", pos + 4, pos + 8);
+    const data = buf.subarray(pos + 8, pos + 8 + len);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+      interlace = data[12];
+    } else if (type === "IDAT") {
+      idat.push(data);
+    } else if (type === "IEND") {
+      break;
+    }
+    pos += 12 + len;
+  }
+  if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6) || interlace !== 0) {
+    throw new Error(`unsupported PNG (need 8-bit RGB/RGBA non-interlaced, got depth=${bitDepth} color=${colorType} interlace=${interlace})`);
+  }
+  const bpp = colorType === 6 ? 4 : 3;
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = width * bpp;
+  const out = Buffer.alloc(width * height * 4);
+  let prevRow = Buffer.alloc(stride);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    const row = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? row[i - bpp] : 0;
+      const b = prevRow[i];
+      const c = i >= bpp ? prevRow[i - bpp] : 0;
+      let v = row[i];
+      switch (filter) {
+        case 1: v = (v + a) & 0xff; break;
+        case 2: v = (v + b) & 0xff; break;
+        case 3: v = (v + ((a + b) >> 1)) & 0xff; break;
+        case 4: {
+          const p = a + b - c;
+          const pa = Math.abs(p - a);
+          const pb = Math.abs(p - b);
+          const pc = Math.abs(p - c);
+          v = (v + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 0xff;
+          break;
         }
-        buf[idx + 3] = 255;
-      } else {
-        buf[idx + 3] = 0;
       }
+      row[i] = v;
+    }
+    prevRow = row;
+    for (let x = 0; x < width; x++) {
+      const si = x * bpp;
+      const di = (y * width + x) * 4;
+      out[di] = row[si];
+      out[di + 1] = row[si + 1];
+      out[di + 2] = row[si + 2];
+      out[di + 3] = bpp === 4 ? row[si + 3] : 255;
     }
   }
-  return buf;
+  return { rgba: out, width, height };
+}
+
+/** Box-average downscale (handles non-integer ratios, e.g. 1024→48). */
+function downscale(rgba, srcW, srcH, dstSize) {
+  const out = Buffer.alloc(dstSize * dstSize * 4);
+  for (let y = 0; y < dstSize; y++) {
+    const y0 = Math.floor((y * srcH) / dstSize);
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * srcH) / dstSize));
+    for (let x = 0; x < dstSize; x++) {
+      const x0 = Math.floor((x * srcW) / dstSize);
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * srcW) / dstSize));
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      let n = 0;
+      for (let sy = y0; sy < y1; sy++) {
+        for (let sx = x0; sx < x1; sx++) {
+          const i = (sy * srcW + sx) * 4;
+          r += rgba[i];
+          g += rgba[i + 1];
+          b += rgba[i + 2];
+          a += rgba[i + 3];
+          n++;
+        }
+      }
+      const o = (y * dstSize + x) * 4;
+      out[o] = Math.round(r / n);
+      out[o + 1] = Math.round(g / n);
+      out[o + 2] = Math.round(b / n);
+      out[o + 3] = Math.round(a / n);
+    }
+  }
+  return out;
 }
 
 function encodePng(rgba, size) {
@@ -100,30 +177,36 @@ function encodePng(rgba, size) {
   return Buffer.concat([sig, ihdr, idat, iend]);
 }
 
-function wrapIco(pngBuffer, size) {
+function buildIco(images) {
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); // reserved
   header.writeUInt16LE(1, 2); // type: icon
-  header.writeUInt16LE(1, 4); // image count
+  header.writeUInt16LE(images.length, 4);
 
-  const entry = Buffer.alloc(16);
-  entry[0] = size >= 256 ? 0 : size; // width (0 = 256)
-  entry[1] = size >= 256 ? 0 : size; // height (0 = 256)
-  entry[2] = 0; // color count
-  entry[3] = 0; // reserved
-  entry.writeUInt16LE(1, 4); // color planes
-  entry.writeUInt16LE(32, 6); // bits per pixel
-  entry.writeUInt32LE(pngBuffer.length, 8); // size of image data
-  entry.writeUInt32LE(22, 12); // offset (6 header + 16 entry)
-
-  return Buffer.concat([header, entry, pngBuffer]);
+  const entries = [];
+  let offset = 6 + 16 * images.length;
+  for (const img of images) {
+    const entry = Buffer.alloc(16);
+    entry[0] = img.size >= 256 ? 0 : img.size; // width (0 = 256)
+    entry[1] = img.size >= 256 ? 0 : img.size; // height
+    entry.writeUInt16LE(1, 4); // color planes
+    entry.writeUInt16LE(32, 6); // bits per pixel
+    entry.writeUInt32LE(img.png.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    offset += img.png.length;
+    entries.push(entry);
+  }
+  return Buffer.concat([header, ...entries, ...images.map((i) => i.png)]);
 }
 
-const rgba = drawPixels(SIZE);
-const png = encodePng(rgba, SIZE);
-const ico = wrapIco(png, SIZE);
+const logo = decodePng(fs.readFileSync(LOGO_PATH));
+const images = ICO_SIZES.map((size) => ({
+  size,
+  png: encodePng(downscale(logo.rgba, logo.width, logo.height, size), size),
+}));
+const ico = buildIco(images);
 
 const outDir = path.join(__dirname, "..", "build");
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "icon.ico"), ico);
-console.log(`Wrote ${path.join(outDir, "icon.ico")} (${ico.length} bytes)`);
+console.log(`Wrote ${path.join(outDir, "icon.ico")} (${ico.length} bytes, sizes: ${ICO_SIZES.join("/")})`);

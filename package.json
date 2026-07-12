@@ -19,6 +19,7 @@
     "files": [
       "src/**/*",
       "renderer/**/*",
+      "resources/**/*",
       "package.json"
     ],
     "directories": {

@@ -59,6 +59,10 @@ function trayStrings() {
   return getStrings(currentSettings.lang);
 }
 
+const LOGO_PATH = path.join(__dirname, "..", "resources", "logo.png");
+const TRAY_SIZE = 16;
+let trayLogoBitmap = null; // cached 16x16 BGRA of the logo
+
 function severityColor(percent) {
   if (percent == null) return [128, 128, 128];
   if (percent >= 90) return [220, 60, 60];
@@ -66,25 +70,42 @@ function severityColor(percent) {
   return [70, 170, 90];
 }
 
+function getTrayLogoBitmap() {
+  if (trayLogoBitmap) return trayLogoBitmap;
+  const img = nativeImage.createFromPath(LOGO_PATH);
+  if (!img.isEmpty()) {
+    trayLogoBitmap = img.resize({ width: TRAY_SIZE, height: TRAY_SIZE, quality: "best" }).toBitmap();
+  }
+  return trayLogoBitmap;
+}
+
+/**
+ * Tray icon: the app logo with a small severity dot (green/amber/red by
+ * session usage) in the bottom-right corner. Falls back to a plain colored
+ * disc if the logo can't be loaded.
+ */
 function makeTrayIcon(percent) {
-  const size = 16;
+  const size = TRAY_SIZE;
   const [r, g, b] = severityColor(percent);
-  const buffer = Buffer.alloc(size * size * 4);
-  const cx = size / 2 - 0.5;
-  const cy = size / 2 - 0.5;
-  const radius = size / 2 - 1.5;
+  const logo = getTrayLogoBitmap();
+  const buffer = logo ? Buffer.from(logo) : Buffer.alloc(size * size * 4);
+  const cx = logo ? size - 4.5 : size / 2 - 0.5;
+  const cy = logo ? size - 4.5 : size / 2 - 0.5;
+  const radius = logo ? 3.5 : size / 2 - 1.5;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
       const dx = x - cx;
       const dy = y - cy;
-      const inside = dx * dx + dy * dy <= radius * radius;
-      if (inside) {
-        buffer[idx] = b; // BGRA
-        buffer[idx + 1] = g;
-        buffer[idx + 2] = r;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= radius) {
+        // 1px dark rim around the dot so it reads on the logo's light areas
+        const rim = logo && dist >= radius - 1;
+        buffer[idx] = rim ? 36 : b; // BGRA
+        buffer[idx + 1] = rim ? 31 : g;
+        buffer[idx + 2] = rim ? 30 : r;
         buffer[idx + 3] = 255;
-      } else {
+      } else if (!logo) {
         buffer[idx + 3] = 0;
       }
     }
@@ -246,6 +267,7 @@ function createPanel() {
     // Only one view (a single provider or the combined one) is shown at a
     // time, so the height no longer depends on how many providers there are.
     height: 700,
+    icon: LOGO_PATH,
     show: false,
     frame: false,
     resizable: false,
