@@ -5,7 +5,7 @@ const path = require("path");
 const { PROVIDERS } = require("./providers");
 const { loadSettings, saveSettings, clampPollIntervalMin, DEFAULT_POLL_INTERVAL_MIN } = require("./settings");
 const { loadWindowState, saveWindowState } = require("./windowState");
-const { getStrings } = require("./i18n");
+const { getStrings, isSupportedLang, DEFAULT_LANG } = require("./i18n");
 
 if (!app.isPackaged) {
   try {
@@ -25,7 +25,7 @@ const providerRuntimes = PROVIDERS.map((provider) => ({
   localStore: provider.createLocalStore(),
 }));
 
-let currentSettings = { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
+let currentSettings = { lang: DEFAULT_LANG, pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
 let savedWindowState = null;
 let moveSaveTimer = null;
 let refreshTimerHandle = null;
@@ -262,7 +262,7 @@ function setView(view) {
 }
 
 function setLanguage(lang) {
-  if (lang !== "en" && lang !== "hu") return;
+  if (!isSupportedLang(lang)) return;
   currentSettings = { ...currentSettings, lang };
   saveSettings(app, currentSettings);
   rebuildTrayMenu();

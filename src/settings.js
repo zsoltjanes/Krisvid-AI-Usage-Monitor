@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { isSupportedLang, DEFAULT_LANG } = require("./i18n");
 
 const DEFAULT_POLL_INTERVAL_MIN = 3;
 const MIN_POLL_INTERVAL_MIN = 1;
@@ -22,13 +23,13 @@ function loadSettings(app) {
     const raw = fs.readFileSync(settingsPath(app), "utf8");
     const parsed = JSON.parse(raw);
     return {
-      lang: parsed.lang === "en" ? "en" : "hu",
+      lang: isSupportedLang(parsed.lang) ? parsed.lang : DEFAULT_LANG,
       pollIntervalMin: clampPollIntervalMin(parsed.pollIntervalMin ?? DEFAULT_POLL_INTERVAL_MIN),
       alwaysOnTop: Boolean(parsed.alwaysOnTop),
       view: typeof parsed.view === "string" ? parsed.view : "aggregate",
     };
   } catch {
-    return { lang: "hu", pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
+    return { lang: DEFAULT_LANG, pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
   }
 }
 

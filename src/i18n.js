@@ -89,10 +89,165 @@ const STRINGS = {
     windowSection: "Egyéb",
     alwaysOnTop: "Ablak mindig felül",
   },
+  de: {
+    appTitle: "Wattsy",
+    appTagline: "AI usage monitor",
+    refresh: "Jetzt aktualisieren",
+    settings: "Einstellungen",
+    back: "Zurück",
+    minimize: "Minimieren",
+    language: "Sprache",
+    refreshInterval: "Aktualisierungsintervall",
+    minutesUnit: (n) => `${n} Min`,
+    session5h: "5-Stunden-Sitzung",
+    weeklyQuota: "Wochenkontingent",
+    monthlyQuota: "Monatskontingent",
+    combinedView: "Gesamt",
+    resetsIn: (h, m) => `Reset in ${h} Std ${m} Min`,
+    resetsInMinutes: (m) => `Reset in ${m} Min`,
+    resetsInDays: (d) => `Reset in ${d} T`,
+    resetsSoon: "Reset bald",
+    unavailable: (err) => `nicht verfügbar (${err})`,
+    emailLabel: "E-Mail",
+    organizationLabel: "Organisation",
+    planLabel: "Tarif",
+    everyNMinutes: (n) => `alle ${n} Min`,
+    todayLabel: "heute ausgegeben (Schätzung)",
+    costTooltip:
+      "Dies ist NICHT dein tatsächlicher Rechnungsbetrag. Es sind hypothetische Kosten, als würde diese Nutzung zu API-Listenpreisen (pro Token) abgerechnet. Bei einem Pauschaltarif (Pro/Max) gilt als echtes Limit die Sitzungs-/Wochen-%-Anzeige oben, nicht dieser Dollarbetrag.",
+    tokenSuffix: "Tokens",
+    modelsSubtitle: "Basierend auf den letzten 7 Tagen",
+    modelHeader: "Modell",
+    tokensHeader: "Tokens",
+    costHeader: "$",
+    loading: "Laden…",
+    updatedAt: (t) => `Aktualisiert: ${t}`,
+    startAtLogin: "Beim Anmelden starten",
+    refreshNow: "Jetzt aktualisieren",
+    quit: "Beenden",
+    trayLoading: "Wattsy — lädt…",
+    about: "Über",
+    aboutCreatedBy: "Erstellt von",
+    aboutBuiltWith: "Erstellt mit Claude Code",
+    versionLabel: (v) => `Version: ${v}`,
+    windowSection: "Sonstiges",
+    alwaysOnTop: "Fenster immer im Vordergrund",
+  },
+  fr: {
+    appTitle: "Wattsy",
+    appTagline: "AI usage monitor",
+    refresh: "Actualiser",
+    settings: "Paramètres",
+    back: "Retour",
+    minimize: "Réduire",
+    language: "Langue",
+    refreshInterval: "Fréquence d'actualisation",
+    minutesUnit: (n) => `${n} min`,
+    session5h: "Session de 5 heures",
+    weeklyQuota: "Quota hebdomadaire",
+    monthlyQuota: "Quota mensuel",
+    combinedView: "Global",
+    resetsIn: (h, m) => `réinit. dans ${h} h ${m} min`,
+    resetsInMinutes: (m) => `réinit. dans ${m} min`,
+    resetsInDays: (d) => `réinit. dans ${d} j`,
+    resetsSoon: "réinit. bientôt",
+    unavailable: (err) => `indisponible (${err})`,
+    emailLabel: "E-mail",
+    organizationLabel: "Organisation",
+    planLabel: "Forfait",
+    everyNMinutes: (n) => `toutes les ${n} min`,
+    todayLabel: "dépensé aujourd'hui (estimation)",
+    costTooltip:
+      "Ce N'EST PAS le montant réel de votre facture. C'est un coût hypothétique, comme si cette utilisation était facturée au tarif API à l'usage (par token). Avec un forfait fixe (Pro/Max), votre véritable limite est indiquée par les jauges de % session/hebdomadaire ci-dessus, pas par ce montant en dollars.",
+    tokenSuffix: "tokens",
+    modelsSubtitle: "Basé sur les 7 derniers jours",
+    modelHeader: "Modèle",
+    tokensHeader: "Tokens",
+    costHeader: "$",
+    loading: "Chargement…",
+    updatedAt: (t) => `Mis à jour : ${t}`,
+    startAtLogin: "Lancer à la connexion",
+    refreshNow: "Actualiser",
+    quit: "Quitter",
+    trayLoading: "Wattsy — chargement…",
+    about: "À propos",
+    aboutCreatedBy: "Créé par",
+    aboutBuiltWith: "Conçu avec Claude Code",
+    versionLabel: (v) => `Version : ${v}`,
+    windowSection: "Autre",
+    alwaysOnTop: "Fenêtre toujours au premier plan",
+  },
+  es: {
+    appTitle: "Wattsy",
+    appTagline: "AI usage monitor",
+    refresh: "Actualizar ahora",
+    settings: "Ajustes",
+    back: "Atrás",
+    minimize: "Minimizar",
+    language: "Idioma",
+    refreshInterval: "Intervalo de actualización",
+    minutesUnit: (n) => `${n} min`,
+    session5h: "Sesión de 5 horas",
+    weeklyQuota: "Cuota semanal",
+    monthlyQuota: "Cuota mensual",
+    combinedView: "Total",
+    resetsIn: (h, m) => `se reinicia en ${h} h ${m} min`,
+    resetsInMinutes: (m) => `se reinicia en ${m} min`,
+    resetsInDays: (d) => `se reinicia en ${d} d`,
+    resetsSoon: "se reinicia pronto",
+    unavailable: (err) => `no disponible (${err})`,
+    emailLabel: "Correo",
+    organizationLabel: "Organización",
+    planLabel: "Plan",
+    everyNMinutes: (n) => `cada ${n} min`,
+    todayLabel: "gastado hoy (estimación)",
+    costTooltip:
+      "Esto NO es el importe real de tu factura. Es un coste hipotético, como si este uso se cobrara a las tarifas de API por uso (por token). Con un plan de tarifa plana (Pro/Max), tu límite real lo indican los medidores de % de sesión/semana de arriba, no esta cifra en dólares.",
+    tokenSuffix: "tokens",
+    modelsSubtitle: "Según los últimos 7 días",
+    modelHeader: "Modelo",
+    tokensHeader: "Tokens",
+    costHeader: "$",
+    loading: "Cargando…",
+    updatedAt: (t) => `Actualizado: ${t}`,
+    startAtLogin: "Iniciar al arrancar sesión",
+    refreshNow: "Actualizar ahora",
+    quit: "Salir",
+    trayLoading: "Wattsy — cargando…",
+    about: "Acerca de",
+    aboutCreatedBy: "Creado por",
+    aboutBuiltWith: "Hecho con Claude Code",
+    versionLabel: (v) => `Versión: ${v}`,
+    windowSection: "Otros",
+    alwaysOnTop: "Ventana siempre visible",
+  },
 };
 
+// Selectable languages, listed in the order the settings panel shows them.
+// `label` is each language's own endonym; `locale` is the BCP-47 tag used for
+// date/time formatting.
+const LANGUAGES = [
+  { code: "hu", label: "Magyar", locale: "hu-HU" },
+  { code: "en", label: "English", locale: "en-US" },
+  { code: "de", label: "Deutsch", locale: "de-DE" },
+  { code: "fr", label: "Français", locale: "fr-FR" },
+  { code: "es", label: "Español", locale: "es-ES" },
+];
+
+const SUPPORTED_LANGS = LANGUAGES.map((l) => l.code);
+const DEFAULT_LANG = "hu";
+
 function getStrings(lang) {
-  return STRINGS[lang] || STRINGS.en;
+  return STRINGS[lang] || STRINGS[DEFAULT_LANG];
 }
 
-module.exports = { getStrings, SUPPORTED_LANGS: Object.keys(STRINGS) };
+function isSupportedLang(lang) {
+  return SUPPORTED_LANGS.includes(lang);
+}
+
+function localeFor(lang) {
+  const entry = LANGUAGES.find((l) => l.code === lang);
+  return entry ? entry.locale : "en-US";
+}
+
+module.exports = { getStrings, LANGUAGES, SUPPORTED_LANGS, DEFAULT_LANG, isSupportedLang, localeFor };

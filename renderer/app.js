@@ -323,7 +323,7 @@ function render(snapshot) {
 
   const status = document.getElementById("statusLine");
   if (snapshot.updatedAt) {
-    const t = new Date(snapshot.updatedAt).toLocaleTimeString(currentLang === "hu" ? "hu-HU" : "en-US");
+    const t = new Date(snapshot.updatedAt).toLocaleTimeString(window.i18n.locale(currentLang));
     status.textContent = `${strings.updatedAt(t)} (${strings.everyNMinutes(currentPollIntervalMin)})`;
   } else {
     status.textContent = strings.loading;
@@ -367,9 +367,32 @@ function setLanguage(lang) {
   applyStaticStrings();
 }
 
+// The language radios are built from the shared i18n language list so adding a
+// language never means touching the markup — each option shows its endonym.
+function buildLangOptions() {
+  const container = document.getElementById("langOptions");
+  container.innerHTML = "";
+  for (const { code, label } of window.i18n.languages) {
+    const option = el("label", "lang-option");
+    const input = el("input");
+    input.type = "radio";
+    input.name = "lang";
+    input.value = code;
+    input.checked = code === currentLang;
+    input.addEventListener("change", (e) => {
+      if (!e.target.checked) return;
+      setLanguage(code);
+      window.usageApi.setLang(code);
+    });
+    option.append(input, el("span", null, label));
+    container.appendChild(option);
+  }
+}
+
 function openSettings() {
-  document.getElementById("langHuRadio").checked = currentLang === "hu";
-  document.getElementById("langEnRadio").checked = currentLang === "en";
+  for (const radio of document.querySelectorAll('input[name="lang"]')) {
+    radio.checked = radio.value === currentLang;
+  }
   document.getElementById("intervalSelect").value = String(currentPollIntervalMin);
   document.getElementById("alwaysOnTopCheckbox").checked = alwaysOnTop;
   document.getElementById("settingsView").classList.remove("hidden");
@@ -411,14 +434,7 @@ for (const link of document.querySelectorAll(".about-row a[data-url]")) {
   });
 }
 
-for (const radio of document.querySelectorAll('input[name="lang"]')) {
-  radio.addEventListener("change", (e) => {
-    if (!e.target.checked) return;
-    const lang = e.target.value;
-    setLanguage(lang);
-    window.usageApi.setLang(lang);
-  });
-}
+buildLangOptions();
 
 document.getElementById("intervalSelect").addEventListener("change", (e) => {
   const minutes = parseInt(e.target.value, 10);

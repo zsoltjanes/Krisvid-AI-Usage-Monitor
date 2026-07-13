@@ -1,7 +1,7 @@
 "use strict";
 
 const { contextBridge, ipcRenderer } = require("electron");
-const { getStrings } = require("./i18n");
+const { getStrings, LANGUAGES, localeFor } = require("./i18n");
 
 contextBridge.exposeInMainWorld("usageApi", {
   onUpdate: (callback) => {
@@ -23,4 +23,6 @@ contextBridge.exposeInMainWorld("usageApi", {
 
 contextBridge.exposeInMainWorld("i18n", {
   strings: (lang) => getStrings(lang),
+  languages: LANGUAGES,
+  locale: (lang) => localeFor(lang),
 });
