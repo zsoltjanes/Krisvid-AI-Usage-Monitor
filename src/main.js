@@ -37,6 +37,7 @@ function getPollIntervalMs() {
 function emptyProviderSnapshot(provider) {
   return {
     name: provider.name,
+    color: provider.color || null,
     limit: { ok: false, error: "not-loaded", session: null, weekly: null },
     local: null,
     account: null,
@@ -119,12 +120,16 @@ function formatPercent(p) {
 
 function buildTooltip() {
   const t = trayStrings();
+  const gaugeLabel = (gauge, fallback) => (gauge && gauge.label && t[gauge.label]) || fallback;
   const blocks = Object.values(snapshot.providers).map((p) => {
     const s = p.limit;
     if (!s.session && !s.weekly) {
       return `${p.name} — ${t.unavailable(s.error)}`;
     }
-    const lines = `${p.name}\n${t.session5h}: ${formatPercent(s.session?.percent)}\n${t.weeklyQuota}: ${formatPercent(s.weekly?.percent)}`;
+    const rows = [p.name];
+    if (s.session) rows.push(`${gaugeLabel(s.session, t.session5h)}: ${formatPercent(s.session.percent)}`);
+    if (s.weekly) rows.push(`${gaugeLabel(s.weekly, t.weeklyQuota)}: ${formatPercent(s.weekly.percent)}`);
+    const lines = rows.join("\n");
     return s.ok ? lines : `${lines}\n(${t.unavailable(s.error)})`;
   });
   return blocks.join("\n\n") || t.trayLoading;

@@ -19,6 +19,12 @@ function fmtPct(p) {
   return p == null ? "n/a" : `${Math.round(p)}%`;
 }
 
+// A gauge may name its own label via an i18n key (e.g. JetBrains AI's
+// "monthlyQuota"); otherwise fall back to the window's default label.
+function gaugeLabel(gauge, fallback) {
+  return (gauge && gauge.label && strings[gauge.label]) || fallback;
+}
+
 function fmtReset(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -54,10 +60,18 @@ function el(tag, className, text) {
   return node;
 }
 
-function makeGauge(label) {
+const FALLBACK_CHART_COLOR = "#4a7fd6";
+
+function makeGauge(label, color) {
   const root = el("div", "gauge");
   const labelRow = el("div", "gauge-label");
-  labelRow.appendChild(el("span", null, label));
+  const name = el("span", null, label);
+  if (color) {
+    const dot = el("span", "provider-dot");
+    dot.style.background = color;
+    name.appendChild(dot);
+  }
+  labelRow.appendChild(name);
   const pct = el("span", null, "–");
   labelRow.appendChild(pct);
   const barWrap = el("div", "bar");
@@ -99,6 +113,11 @@ function makeTodaySection(costUsd, tokens) {
   return today;
 }
 
+/**
+ * Daily cost chart. Each day is { date, costUsd, parts } where parts is
+ * [{ name, color, costUsd }] — one segment per provider, so the combined
+ * view shows a stacked bar in each provider's color.
+ */
 function buildChart(days) {
   const chart = el("section", "chart");
   const maxCost = Math.max(0.01, ...days.map((d) => d.costUsd));
@@ -107,7 +126,16 @@ function buildChart(days) {
     const bar = el("div", "chart-bar");
     const pct = Math.max(2, Math.round((d.costUsd / maxCost) * 100));
     bar.style.height = `${pct}%`;
-    bar.title = `${d.date}: ${fmtUsd(d.costUsd)}`;
+    const parts = (d.parts || []).filter((p) => p.costUsd > 0);
+    for (const p of parts) {
+      const seg = el("div", "chart-seg");
+      seg.style.flexGrow = p.costUsd;
+      seg.style.background = p.color || FALLBACK_CHART_COLOR;
+      bar.appendChild(seg);
+    }
+    const lines = [`${d.date}: ${fmtUsd(d.costUsd)}`];
+    if (parts.length > 1) lines.push(...parts.map((p) => `${p.name}: ${fmtUsd(p.costUsd)}`));
+    bar.title = lines.join("\n");
     const label = el("div", "chart-day", d.date.slice(5)); // MM-DD
     wrap.append(bar, label);
     chart.appendChild(wrap);
@@ -160,7 +188,7 @@ function renderProviderBlock(data) {
   const errNote = isError ? ` · ${strings.unavailable(limit.error)}` : "";
 
   const gauges = el("section", "gauges");
-  const sessionGauge = makeGauge(strings.session5h);
+  const sessionGauge = makeGauge(gaugeLabel(session, strings.session5h));
   sessionGauge.pct.textContent = fmtPct(session?.percent);
   sessionGauge.bar.style.width = `${Math.min(100, session?.percent ?? 0)}%`;
   sessionGauge.bar.className = `bar-fill ${pctClass(session?.percent)}`;
@@ -169,18 +197,27 @@ function renderProviderBlock(data) {
     : isError
       ? strings.unavailable(limit.error)
       : "–";
+  gauges.appendChild(sessionGauge.root);
 
-  const weeklyGauge = makeGauge(strings.weeklyQuota);
-  weeklyGauge.pct.textContent = fmtPct(weekly?.percent);
-  weeklyGauge.bar.style.width = `${Math.min(100, weekly?.percent ?? 0)}%`;
-  weeklyGauge.bar.className = `bar-fill ${pctClass(weekly?.percent)}`;
-  weeklyGauge.sub.textContent = weekly ? `${fmtReset(weekly.resetsAt)}${errNote}` : "–";
-
-  gauges.append(sessionGauge.root, weeklyGauge.root);
+  // Providers without a second window (e.g. JetBrains AI, which only has a
+  // monthly quota) leave weekly null — show a single gauge rather than an
+  // empty "–" one.
+  if (weekly) {
+    const weeklyGauge = makeGauge(gaugeLabel(weekly, strings.weeklyQuota));
+    weeklyGauge.pct.textContent = fmtPct(weekly.percent);
+    weeklyGauge.bar.style.width = `${Math.min(100, weekly.percent ?? 0)}%`;
+    weeklyGauge.bar.className = `bar-fill ${pctClass(weekly.percent)}`;
+    weeklyGauge.sub.textContent = `${fmtReset(weekly.resetsAt)}${errNote}`;
+    gauges.appendChild(weeklyGauge.root);
+  }
   root.appendChild(gauges);
 
   root.appendChild(makeTodaySection(local ? local.today.costUsd : 0, local ? local.today.tokens : 0));
-  root.appendChild(buildChart(local ? local.last7Days : []));
+  const chartDays = (local ? local.last7Days : []).map((d) => ({
+    ...d,
+    parts: [{ name: data.name, color: data.color, costUsd: d.costUsd }],
+  }));
+  root.appendChild(buildChart(chartDays));
   root.appendChild(buildModelsTable(local ? local.byModel : []));
   root.appendChild(makeAccountBlock(account));
   return root;
@@ -199,14 +236,16 @@ function renderAggregate(providers, ids) {
     const limit = p.limit || {};
     const session = limit.session ?? null;
     const weekly = limit.weekly ?? null;
-    const gauge = makeGauge(p.name);
+    const gauge = makeGauge(p.name, p.color);
     gauge.pct.textContent = fmtPct(session?.percent);
     gauge.bar.style.width = `${Math.min(100, session?.percent ?? 0)}%`;
     gauge.bar.className = `bar-fill ${pctClass(session?.percent)}`;
     const isError = limit && !limit.ok && limit.error !== "not-loaded";
     const parts = [];
-    if (session) parts.push(`${strings.session5h}: ${fmtReset(session.resetsAt) || fmtPct(session.percent)}`);
-    if (weekly) parts.push(`${strings.weeklyQuota}: ${fmtPct(weekly.percent)}`);
+    if (session) {
+      parts.push(`${gaugeLabel(session, strings.session5h)}: ${fmtReset(session.resetsAt) || fmtPct(session.percent)}`);
+    }
+    if (weekly) parts.push(`${gaugeLabel(weekly, strings.weeklyQuota)}: ${fmtPct(weekly.percent)}`);
     if (isError) parts.push(strings.unavailable(limit.error));
     gauge.sub.textContent = parts.length > 0 ? parts.join(" · ") : "–";
     gauges.appendChild(gauge.root);
@@ -215,15 +254,17 @@ function renderAggregate(providers, ids) {
 
   let todayCost = 0;
   let todayTokens = 0;
-  const byDay = new Map(); // date -> costUsd
+  const byDay = new Map(); // date -> [{ name, color, costUsd }]
   const byModel = [];
   for (const id of ids) {
-    const local = providers[id].local;
+    const p = providers[id];
+    const local = p.local;
     if (!local) continue;
     todayCost += local.today.costUsd || 0;
     todayTokens += local.today.tokens || 0;
     for (const d of local.last7Days) {
-      byDay.set(d.date, (byDay.get(d.date) || 0) + d.costUsd);
+      if (!byDay.has(d.date)) byDay.set(d.date, []);
+      byDay.get(d.date).push({ name: p.name, color: p.color, costUsd: d.costUsd });
     }
     byModel.push(...local.byModel);
   }
@@ -231,7 +272,11 @@ function renderAggregate(providers, ids) {
   root.appendChild(makeTodaySection(todayCost, todayTokens));
   const chartDays = [...byDay.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([date, costUsd]) => ({ date, costUsd }));
+    .map(([date, parts]) => ({
+      date,
+      costUsd: parts.reduce((sum, p) => sum + p.costUsd, 0),
+      parts,
+    }));
   root.appendChild(buildChart(chartDays));
   root.appendChild(buildModelsTable(byModel));
   return root;

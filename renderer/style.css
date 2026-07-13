@@ -144,6 +144,14 @@ header {
   color: #c5c6cf;
 }
 
+.provider-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 6px;
+}
+
 .bar {
   height: 8px;
   background: #2c2e36;
@@ -227,9 +235,17 @@ header {
 
 .chart-bar {
   width: 100%;
-  background: #4a7fd6;
+  display: flex;
+  /* stacked provider segments, first provider at the bottom */
+  flex-direction: column-reverse;
+  background: #2c2e36;
   border-radius: 2px 2px 0 0;
+  overflow: hidden;
   min-height: 2px;
+}
+
+.chart-seg {
+  width: 100%;
 }
 
 .chart-day {

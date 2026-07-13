@@ -13,6 +13,7 @@ const store = new CodexUsageStore();
 module.exports = {
   id: "codex",
   name: "Codex",
+  color: "#10a37f",
   isAvailable: () => fs.existsSync(path.join(os.homedir(), ".codex")) || fs.existsSync(SESSIONS_DIR),
   fetchLimitUsage: async () => {
     try {

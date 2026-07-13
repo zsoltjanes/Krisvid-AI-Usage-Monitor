@@ -10,6 +10,7 @@ const { readAccountInfo } = require("./account");
 module.exports = {
   id: "claude",
   name: "Claude Code",
+  color: "#4a7fd6",
   isAvailable: () => fs.existsSync(path.join(os.homedir(), ".claude")),
   fetchLimitUsage,
   createLocalStore: () => new LocalUsageStore(),
