@@ -64,8 +64,10 @@ class LocalUsageStore {
         (usage.cache_creation_input_tokens || 0) +
         (usage.cache_read_input_tokens || 0);
 
+      const timestamp = entry.timestamp || new Date().toISOString();
       this.records.push({
-        date: dayKey(entry.timestamp || new Date().toISOString()),
+        date: dayKey(timestamp),
+        timestamp,
         model: model || "unknown",
         costUsd,
         tokens: totalTokens,

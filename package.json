@@ -1,7 +1,7 @@
 {
-  "name": "ai-usage",
-  "version": "1.0.0",
-  "description": "Wattsy — AI usage tray monitor (Claude Code, OpenAI Codex)",
+  "name": "krisvid-ai-usage-monitor",
+  "version": "1.0.3",
+  "description": "Krisvid — AI usage tray monitor",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -13,12 +13,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "Zsolt",
+  "author": "Zsolt Janes",
   "license": "ISC",
   "type": "commonjs",
   "build": {
-    "appId": "com.janes.wattsy",
-    "productName": "Wattsy",
+    "appId": "com.janes.krisvid",
+    "productName": "Krisvid",
     "files": [
       "src/**/*",
       "renderer/**/*",

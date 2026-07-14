@@ -6,6 +6,7 @@ const { PROVIDERS } = require("./providers");
 const { loadSettings, saveSettings, clampPollIntervalMin, DEFAULT_POLL_INTERVAL_MIN } = require("./settings");
 const { loadWindowState, saveWindowState } = require("./windowState");
 const { getStrings, isSupportedLang, DEFAULT_LANG } = require("./i18n");
+const { maybeCaptureScreenshot } = require("./devScreenshot");
 
 if (!app.isPackaged) {
   try {
@@ -18,6 +19,17 @@ if (!app.isPackaged) {
 const RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000; // fallback backoff on HTTP 429 without Retry-After
 const MOVE_SAVE_DEBOUNCE_MS = 400;
 
+// The panel auto-sizes to its content (the renderer measures and reports the
+// height it needs — shorter when the Details section is collapsed, taller when
+// expanded), clamped to this range. The renderer caps the scrollable models
+// table so it targets ~640; this ceiling is a bit higher as a safety net for
+// when the fixed content (tall gauges + chart) leaves little room for the
+// table. clampToWorkArea keeps it within the screen on smaller displays.
+const PANEL_WIDTH = 340;
+const PANEL_MIN_HEIGHT = 170;
+const PANEL_MAX_HEIGHT = 740;
+const PANEL_INITIAL_HEIGHT = 320; // pre-first-measure placeholder
+
 let tray = null;
 let panel = null;
 const providerRuntimes = PROVIDERS.map((provider) => ({
@@ -28,6 +40,7 @@ const providerRuntimes = PROVIDERS.map((provider) => ({
 let currentSettings = { lang: DEFAULT_LANG, pollIntervalMin: DEFAULT_POLL_INTERVAL_MIN, alwaysOnTop: false, view: "aggregate" };
 let savedWindowState = null;
 let moveSaveTimer = null;
+let resizingPanel = false; // guards the move handler while we programmatically resize
 let refreshTimerHandle = null;
 
 function getPollIntervalMs() {
@@ -273,10 +286,11 @@ function setLanguage(lang) {
 
 function createPanel() {
   const opts = {
-    width: 380,
-    // Only one view (a single provider or the combined one) is shown at a
-    // time, so the height no longer depends on how many providers there are.
-    height: 700,
+    width: PANEL_WIDTH,
+    // Placeholder height only — the renderer measures its real content height
+    // after the first render and drives resizes from there (see the
+    // "panel:set-height" handler and setPanelHeight).
+    height: PANEL_INITIAL_HEIGHT,
     icon: LOGO_PATH,
     show: false,
     frame: false,
@@ -298,8 +312,12 @@ function createPanel() {
     },
   };
   if (savedWindowState) {
-    opts.x = savedWindowState.x;
-    opts.y = savedWindowState.y;
+    // Clamp the restored position in case it was saved on a monitor that's no
+    // longer connected (or otherwise off-screen) — the draggable header must
+    // stay reachable.
+    const { x, y } = clampToWorkArea(savedWindowState.x, savedWindowState.y, opts.width, opts.height);
+    opts.x = x;
+    opts.y = y;
   }
   panel = new BrowserWindow(opts);
   panel.setAlwaysOnTop(Boolean(currentSettings.alwaysOnTop));
@@ -313,6 +331,7 @@ function createPanel() {
 
   // Persist the dragged-to position (debounced) so it's restored on next launch.
   panel.on("move", () => {
+    if (resizingPanel) return; // our own bottom-anchor reposition, not a user drag
     clearTimeout(moveSaveTimer);
     moveSaveTimer = setTimeout(() => {
       if (!panel || panel.isDestroyed() || panel.isMinimized()) return;
@@ -321,6 +340,33 @@ function createPanel() {
       saveWindowState(app, savedWindowState);
     }, MOVE_SAVE_DEBOUNCE_MS);
   });
+}
+
+// Clamp a window rect fully inside its display's work area, so the draggable
+// header can never end up off-screen (e.g. after the panel grows upward past
+// the top edge, or when a saved position lands on a now-disconnected monitor).
+// Returns { x, y } for the given size.
+function clampToWorkArea(x, y, width, height) {
+  const { workArea } = screen.getDisplayMatching({ x, y, width, height });
+  const clampedX = Math.max(workArea.x, Math.min(x, workArea.x + workArea.width - width));
+  const clampedY = Math.max(workArea.y, Math.min(y, workArea.y + workArea.height - height));
+  return { x: clampedX, y: clampedY };
+}
+
+// Resize the panel to the content height the renderer reports, clamped to the
+// allowed range. The panel sits above the tray, so we keep its bottom edge
+// anchored and grow/shrink upward rather than pushing into the taskbar — then
+// clamp so the header stays on-screen even when growing past the top edge.
+function setPanelHeight(height) {
+  if (!panel || panel.isDestroyed() || panel.isMinimized()) return;
+  const target = Math.max(PANEL_MIN_HEIGHT, Math.min(PANEL_MAX_HEIGHT, Math.ceil(height)));
+  const [width, currentHeight] = panel.getSize();
+  if (target === currentHeight) return;
+  const [x, y] = panel.getPosition();
+  const { x: newX, y: newY } = clampToWorkArea(x, y + (currentHeight - target), width, target);
+  resizingPanel = true;
+  panel.setBounds({ x: newX, y: newY, width, height: target });
+  resizingPanel = false;
 }
 
 function positionPanelNearTray(bounds) {
@@ -366,7 +412,7 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(() => {
-  app.setAppUserModelId("com.janes.wattsy");
+  app.setAppUserModelId("com.janes.krisvid");
   currentSettings = loadSettings(app);
   savedWindowState = loadWindowState(app);
   snapshot.settings = currentSettings;
@@ -391,6 +437,9 @@ app.whenReady().then(() => {
   ipcMain.on("panel:minimize", () => {
     if (panel && !panel.isDestroyed()) panel.minimize();
   });
+  ipcMain.on("panel:set-height", (_event, height) => {
+    if (typeof height === "number" && Number.isFinite(height)) setPanelHeight(height);
+  });
   ipcMain.on("shell:open-external", (_event, url) => {
     // Only ever open the app's own known links, never an arbitrary
     // renderer-supplied URL.
@@ -399,6 +448,9 @@ app.whenReady().then(() => {
   });
 
   scheduleNextRefresh();
+
+  // Dev-only, no-op unless AI_USAGE_SCREENSHOT is set (see devScreenshot.js).
+  maybeCaptureScreenshot(app, panel);
 });
 
 // No app.quit() here on purpose — the app lives in the tray even with no

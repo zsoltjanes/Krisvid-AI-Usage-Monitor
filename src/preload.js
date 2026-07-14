@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("usageApi", {
   setAlwaysOnTop: (enabled) => ipcRenderer.send("settings:set-always-on-top", enabled),
   setView: (view) => ipcRenderer.send("settings:set-view", view),
   minimize: () => ipcRenderer.send("panel:minimize"),
+  setPanelHeight: (height) => ipcRenderer.send("panel:set-height", height),
   openExternal: (url) => ipcRenderer.send("shell:open-external", url),
 });
 

@@ -14,7 +14,10 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* The window auto-sizes to this content: the renderer measures .panel's own
+     height and main.js resizes the window to match (shorter when the Usage
+     section is collapsed, taller when open). So the panel is content-height,
+     never 100vh — a fixed height would defeat the measurement. */
   padding: 14px 16px;
   gap: 12px;
 }
@@ -71,6 +74,7 @@ header {
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  flex-shrink: 0; /* fixed below the scrollable Usage body */
 }
 
 .account-line {
@@ -87,19 +91,20 @@ header {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  /* The gauges + the "Usage" header stay fixed; only the Usage section's body
+     scrolls (see .collapsible-body), so this outer container itself doesn't. */
+  overflow: visible;
 }
 
-.providers::-webkit-scrollbar {
+/* Scrollbar styling for the models table — the one internal scroll region. */
+.models::-webkit-scrollbar {
   width: 6px;
 }
-.providers::-webkit-scrollbar-thumb {
+.models::-webkit-scrollbar-thumb {
   background: #33343c;
   border-radius: 3px;
 }
-.providers::-webkit-scrollbar-track {
+.models::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -135,6 +140,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0; /* fixed above the scrollable Usage body */
 }
 
 .gauge-label {
@@ -219,18 +225,49 @@ header {
 
 .chart {
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Bars row and labels row use identical equal-flex layouts + gaps so each
+   label lines up under its column. */
+.chart-bars {
+  display: flex;
   align-items: flex-end;
   gap: 4px;
   height: 90px;
 }
-
-.chart-bar-wrap {
-  flex: 1;
+.chart-labels {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* 24-hour view: 24 buckets divide the width evenly with hairline separators,
+   each slot's track visible so it reads as a histogram over the whole day. */
+.chart.hourly .chart-bars,
+.chart.hourly .chart-labels {
+  gap: 1px;
+}
+.chart.hourly .chart-track {
+  background: #2c2e36; /* every hour's slot is visible, even empty ones */
+  border-radius: 0;
+}
+.chart.hourly .chart-bar {
+  border-radius: 0;
+  min-height: 0; /* empty hours show just the track, no colored stub */
+}
+
+/* The column slot: in the daily view it's transparent (the bar carries its own
+   background); in the hourly view it's tinted (above) so all 24 equal slots
+   are visible. min-width:0 lets every column shrink equally. */
+.chart-track {
+  flex: 1;
+  min-width: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
 }
 
 .chart-bar {
@@ -248,21 +285,104 @@ header {
   width: 100%;
 }
 
-.chart-day {
+.chart-label-cell {
+  flex: 1;
+  min-width: 0; /* labels overflow their slot instead of widening it */
+  text-align: center;
   font-size: 9px;
   color: #6c6e78;
-  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.collapsible {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* the "Details" toggle is centered */
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0; /* stays fixed above the scrollable body */
+}
+
+.collapsible-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c5c6cf;
+  min-width: 0;
+  padding: 5px 14px;
+  border-radius: 6px;
+  /* Button-like background (the same tone as the hover state) so it reads as
+     a clickable control at rest. */
+  background: #2c2e36;
+  border: 1px solid #33343c;
+  transition: background 0.12s ease;
+}
+.collapsible-header:hover .collapsible-title-row {
+  background: #33353f;
+  color: #fff;
+}
+
+.collapsible-chevron {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 1;
+  color: #a9abb5;
+  transition: transform 0.15s ease;
+}
+
+.collapsible.collapsed .collapsible-chevron {
+  transform: rotate(-90deg);
+}
+
+.collapsible-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Not itself scrollable — the today total and chart stay fixed. Only the
+     models table below scrolls (see .models). */
+  overflow: visible;
+}
+
+.collapsible.collapsed .collapsible-body {
+  display: none;
 }
 
 .models {
-  max-height: 170px; /* room for a header row + ~4-5 model rows, scrolls beyond that */
+  /* The one scroll region. Its max-height is set dynamically in the renderer
+     (syncWindowHeight): the window fits content until it hits the max, then
+     only this table scrolls — everything above it (gauges, Details button,
+     today total, chart) stays fixed. */
   overflow-y: auto;
+  padding-right: 4px; /* room for the scrollbar so content isn't hidden */
 }
 
-.models-subtitle {
+.range-select-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px; /* keep the select off the today section's top divider */
+}
+
+.range-select {
+  background: #26272e;
+  color: #c5c6cf;
+  border: 1px solid #33343c;
+  border-radius: 6px;
+  padding: 3px 6px;
   font-size: 10px;
-  color: #6c6e78;
-  margin-bottom: 4px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.range-select:hover {
+  background: #2c2e36;
 }
 
 table {
@@ -277,6 +397,10 @@ th {
   font-weight: 500;
   padding: 4px 2px;
   border-bottom: 1px solid #2c2e36;
+  /* Header row stays fixed while the table body scrolls under it. */
+  position: sticky;
+  top: 0;
+  background: #1e1f24;
 }
 
 td {

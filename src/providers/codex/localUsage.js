@@ -74,8 +74,10 @@ class CodexUsageStore {
       const usage = payload.info && payload.info.last_token_usage;
       if (!usage) continue;
       const { costUsd } = costForUsage(state.model, usage);
+      const timestamp = entry.timestamp || new Date().toISOString();
       this.records.push({
-        date: dayKey(entry.timestamp || new Date().toISOString()),
+        date: dayKey(timestamp),
+        timestamp,
         model: state.model || "unknown",
         costUsd,
         tokens: usage.total_tokens || (usage.input_tokens || 0) + (usage.output_tokens || 0),

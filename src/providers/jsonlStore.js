@@ -59,23 +59,37 @@ function dayKey(isoTimestamp) {
   return isoTimestamp.slice(0, 10); // YYYY-MM-DD (UTC-based, consistent with timestamps)
 }
 
+// Hour bucket key: the timestamp floored to the start of its local hour,
+// as an ISO string — used to group the last-24h chart/model breakdown.
+function hourKey(isoTimestamp) {
+  const d = new Date(isoTimestamp);
+  d.setMinutes(0, 0, 0);
+  return d.toISOString();
+}
+
 /**
- * Aggregates usage records ({ date, model, costUsd, tokens, project }) into
- * the snapshot shape the renderer's provider block consumes.
+ * Aggregates usage records ({ date, timestamp, model, costUsd, tokens,
+ * project }) into the snapshot shape the renderer's provider block consumes.
  */
 function aggregateRecords(records) {
-  const today = dayKey(new Date().toISOString());
-  const cutoff = new Date();
+  const now = new Date();
+  const today = dayKey(now.toISOString());
+  const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - 6);
   const cutoffKey = dayKey(cutoff.toISOString());
+  const cutoff24hMs = now.getTime() - 24 * 60 * 60 * 1000;
 
   let todayCost = 0;
   let todayTokens = 0;
   let todayHasUnknownRate = false;
 
   const byDay = new Map(); // date -> costUsd
+  const byDayModel = new Map(); // date -> Map(model -> costUsd)
   const byModel = new Map(); // model -> { costUsd, tokens }
   const byProject = new Map(); // project -> costUsd
+  const byHour = new Map(); // hour bucket -> costUsd
+  const byHourModel = new Map(); // hour bucket -> Map(model -> costUsd)
+  const byModel24h = new Map(); // model -> { costUsd, tokens }, last 24h only
 
   for (const r of records) {
     if (r.date === today) {
@@ -86,24 +100,58 @@ function aggregateRecords(records) {
 
     if (r.date >= cutoffKey) {
       byDay.set(r.date, (byDay.get(r.date) || 0) + (r.costUsd || 0));
-    }
 
-    if (r.date >= cutoffKey) {
       const m = byModel.get(r.model) || { costUsd: 0, tokens: 0 };
       m.tokens += r.tokens;
       m.costUsd += r.costUsd || 0;
       byModel.set(r.model, m);
+
+      if (!byDayModel.has(r.date)) byDayModel.set(r.date, new Map());
+      const dm = byDayModel.get(r.date);
+      dm.set(r.model, (dm.get(r.model) || 0) + (r.costUsd || 0));
+    }
+
+    const ts = Date.parse(r.timestamp || r.date);
+    if (!Number.isNaN(ts) && ts >= cutoff24hMs) {
+      const hk = hourKey(r.timestamp || r.date);
+      byHour.set(hk, (byHour.get(hk) || 0) + (r.costUsd || 0));
+
+      const m24 = byModel24h.get(r.model) || { costUsd: 0, tokens: 0 };
+      m24.tokens += r.tokens;
+      m24.costUsd += r.costUsd || 0;
+      byModel24h.set(r.model, m24);
+
+      if (!byHourModel.has(hk)) byHourModel.set(hk, new Map());
+      const hm = byHourModel.get(hk);
+      hm.set(r.model, (hm.get(r.model) || 0) + (r.costUsd || 0));
     }
 
     byProject.set(r.project, (byProject.get(r.project) || 0) + (r.costUsd || 0));
   }
+
+  // Map(model -> costUsd) -> [{ model, costUsd }], highest cost first.
+  const modelBreakdown = (map) =>
+    map
+      ? [...map.entries()]
+          .filter(([, costUsd]) => costUsd > 0)
+          .sort((a, b) => b[1] - a[1])
+          .map(([model, costUsd]) => ({ model, costUsd }))
+      : [];
 
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     const key = dayKey(d.toISOString());
-    last7Days.push({ date: key, costUsd: byDay.get(key) || 0 });
+    last7Days.push({ date: key, costUsd: byDay.get(key) || 0, models: modelBreakdown(byDayModel.get(key)) });
+  }
+
+  const last24Hours = [];
+  for (let i = 23; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+    d.setMinutes(0, 0, 0);
+    const key = d.toISOString();
+    last24Hours.push({ date: key, costUsd: byHour.get(key) || 0, models: modelBreakdown(byHourModel.get(key)) });
   }
 
   const topProjects = [...byProject.entries()]
@@ -114,10 +162,12 @@ function aggregateRecords(records) {
   return {
     today: { costUsd: todayCost, tokens: todayTokens, hasUnknownRate: todayHasUnknownRate },
     last7Days,
+    last24Hours,
     byModel: [...byModel.entries()].map(([model, v]) => ({ model, ...v })),
+    byModel24h: [...byModel24h.entries()].map(([model, v]) => ({ model, ...v })),
     topProjects,
     updatedAt: new Date().toISOString(),
   };
 }
 
-module.exports = { listJsonlFiles, readNewLines, dayKey, aggregateRecords };
+module.exports = { listJsonlFiles, readNewLines, dayKey, hourKey, aggregateRecords };

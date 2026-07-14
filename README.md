@@ -1,12 +1,12 @@
-# Wattsy — AI Usage Monitor
+# Krisvid — AI Usage Monitor
 
-Wattsy is a lightweight Windows, macOS, and Linux tray app that monitors AI coding-agent usage: plan limits and local token/cost statistics for [Claude Code](https://claude.com/claude-code), [OpenAI Codex](https://openai.com/codex/), and [JetBrains AI](https://www.jetbrains.com/ai/) (AI Assistant / Junie), without having to run `/usage` manually.
+Krisvid is a lightweight Windows, macOS, and Linux tray app that monitors AI coding-agent usage: plan limits and local token/cost statistics for [Claude Code](https://claude.com/claude-code), [OpenAI Codex](https://openai.com/codex/), and [JetBrains AI](https://www.jetbrains.com/ai/) (AI Assistant / Junie), without having to run `/usage` manually.
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue) ![node](https://img.shields.io/badge/node-%3E%3D18-green) ![license](https://img.shields.io/badge/license-ISC-lightgrey)
 
-Repository: <https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor>
+Repository: <https://github.com/zsoltjanes/KRISVID-AI-Usage-Monitor>
 
-![Wattsy application screenshot](resources/screenshot_1.png)
+![Krisvid application screenshot](resources/screenshot_1.png)
 
 ## Features
 
@@ -44,15 +44,15 @@ No telemetry is collected. The only external request is the Anthropic usage requ
 
 Download the matching artifact from [Releases](../../releases):
 
-- **Windows:** the `Wattsy Setup *.exe` installer.
+- **Windows:** the `Krisvid Setup *.exe` installer.
 - **macOS:** the `.dmg` disk image or `.zip` archive.
 - **Linux:** the `.AppImage` or `.deb` package.
 
 Alternatively, run it from source on any supported operating system:
 
 ```sh
-git clone https://github.com/zsoltjanes/Wattsy-AI-Usage-Monitor.git
-cd Wattsy-AI-Usage-Monitor
+git clone https://github.com/zsoltjanes/KRISVID-AI-Usage-Monitor.git
+cd KRISVID-AI-Usage-Monitor
 npm install
 npm start
 ```

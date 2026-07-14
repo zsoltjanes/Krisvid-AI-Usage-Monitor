@@ -1,4 +1,4 @@
-# Wattsy — project notes for Claude Code
+# Krisvid — project notes for Claude Code
 
 Electron tray app that monitors AI coding-agent usage (plan limits + local
 token/cost stats). Multi-provider: **Claude Code**, **OpenAI Codex**,
@@ -20,6 +20,17 @@ token/cost stats). Multi-provider: **Claude Code**, **OpenAI Codex**,
 - `renderer/app.js` + `renderer/style.css` + `renderer/index.html` — the panel
   UI. Talks to main only through `window.usageApi` / `window.i18n` exposed by
   `src/preload.js` (contextIsolation on, sandbox off).
+- **Auto-height window**: the panel window has no fixed height. The renderer
+  measures its content (`syncWindowHeight` in `app.js`, called after every
+  render / collapse-toggle / range-change / settings open-close) and sends it
+  via `panel:set-height`; `main.js` `setPanelHeight` resizes the window
+  (bottom-anchored, clamped to `[PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT]`) and
+  `clampToWorkArea`-keeps the draggable header on-screen. The **Details**
+  section (collapsible, `makeCollapsible`) is the one scroll region: when
+  content would exceed the max, the renderer caps `.collapsible-body`'s
+  height so only it scrolls while the gauges + Details header above stay
+  fixed. Everything owned by the section (incl. the 7d/24h range `<select>`)
+  lives inside its body so it only shows while expanded.
 
 ## Providers — key facts
 
@@ -63,21 +74,32 @@ block + a `LANGUAGES` entry, nothing else. Validation in `settings.js` and
   The CLI shell sets `ELECTRON_RUN_AS_NODE=1` (electron runs as plain Node and
   crashes on `app.isPackaged`); the `npx electron` shim is unreliable. Use the
   direct exe.
-- **Single instance**: only one Wattsy runs at a time. A leaked dev instance
+- **Single instance**: only one Krisvid runs at a time. A leaked dev instance
   silently blocks new launches (instant exit, no screenshot written). Find via
-  `tasklist //v //fi "IMAGENAME eq electron.exe" //fo csv | grep -i wattsy` and
-  kill with `taskkill //fi "WINDOWTITLE eq Wattsy*" //t //f`. The **installed**
-  app is `%LOCALAPPDATA%/Programs/Wattsy/Wattsy.exe` (title also "Wattsy") —
+  `tasklist //v //fi "IMAGENAME eq electron.exe" //fo csv | grep -i krisvid` and
+  kill with `taskkill //fi "WINDOWTITLE eq Krisvid*" //t //f`. The **installed**
+  app is `%LOCALAPPDATA%/Programs/Krisvid/Krisvid.exe` (title also "Krisvid") —
   stop it before running the dev build, restart it after. Never kill unrelated
   `electron.exe`.
-- **Screenshot to verify UI**: temporarily add an env-guarded hook in `main.js`
-  after `scheduleNextRefresh()` that, on `AI_USAGE_SCREENSHOT`, waits ~12s then
-  `panel.webContents.capturePage()` → PNG (optionally click `#settingsBtn` via
-  `executeJavaScript` first, guarded by another env var, with a ~500ms repaint
-  delay). Remove the hook after. Screenshots go to the scratchpad dir.
+- **Screenshot to verify UI**: `src/devScreenshot.js` is a permanent dev-only
+  helper (wired into `main.js` after `scheduleNextRefresh()`; a complete no-op
+  in the shipped app). Don't paste/delete a hook anymore — just set env vars:
+  - `AI_USAGE_SCREENSHOT=<png path>` — arms it; waits ~12s for data, captures
+    `panel.webContents.capturePage()` → PNG, then quits.
+  - `AI_USAGE_SCREENSHOT_DELAY=<ms>` — override the pre-capture wait.
+  - `AI_USAGE_SCREENSHOT_CLICK="<js>"` — JS run in the renderer before capture
+    (e.g. `document.getElementById('settingsBtn').click()`, toggle a section,
+    or return a value — logged as `CLICK_RESULT` for DOM assertions), with a
+    ~500ms repaint delay after.
+
+  Example: `AI_USAGE_SCREENSHOT="…/scratchpad/shot.png" env -u ELECTRON_RUN_AS_NODE ./node_modules/electron/dist/electron.exe .`
+  Screenshots go to the scratchpad dir. Stale/zombie `electron.exe` instances
+  block new launches (screenshot never written) — kill them by PID if
+  `WINDOWTITLE eq Krisvid*` finds nothing.
 - **Forcing a view/lang for a screenshot**: edit
-  `%APPDATA%/ai-usage/settings.json` (`view`, `lang`) before launching, then
-  restore it afterward — test runs otherwise persist stray values.
+  `%APPDATA%/krisvid-ai-usage-monitor/settings.json` (`view`, `lang`) before
+  launching, then restore it afterward — test runs otherwise persist stray
+  values. (The folder name follows `name` in package.json.)
 - **PowerShell is deny-listed** in this project's Bash; use tasklist/taskkill/
   node one-liners. Reading credential stores (e.g. `github-copilot/oauth.json`)
   is blocked by the safety classifier — don't try.

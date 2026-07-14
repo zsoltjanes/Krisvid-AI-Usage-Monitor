@@ -8,6 +8,68 @@ let appVersion = null;
 let alwaysOnTop = false;
 let currentView = "aggregate"; // "aggregate" | provider id
 
+// Collapsed/expanded state per collapsible section, and the selected time
+// range for the chart+models block — kept across re-renders (render()
+// rebuilds the DOM on every poll) and across app restarts.
+function loadJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+function saveJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore (e.g. storage disabled)
+  }
+}
+const collapsedSections = loadJson("krisvid-collapsed-sections", {});
+let statsRange = loadJson("krisvid-stats-range", "7d"); // "7d" | "24h"
+
+// The preferred tallest window height before the models table starts scrolling
+// internally. main.js clamps to a slightly higher hard ceiling so a tall fixed
+// area (gauges + chart) can still leave a couple of table rows visible.
+const PANEL_MAX_HEIGHT = 640;
+// The models table never shrinks below this while scrolling (≈2 rows visible).
+const MODELS_MIN_HEIGHT = 76;
+
+// Ask the main process to resize the window to fit the current content, so the
+// app is only as tall as what it shows (shorter with the Details section
+// collapsed, taller when open). Measured after layout via requestAnimationFrame.
+//
+// When content fits, the window matches it exactly (no scrollbar anywhere).
+// When it would exceed PANEL_MAX_HEIGHT, we cap only the models table's height
+// so the window stops at the max and just that table scrolls — everything
+// above it (gauges, Details button, today total, chart) stays fixed. The cap
+// is dynamic because the fixed content's height varies by view (1–3 providers,
+// optional account block), so a static CSS max-height can't know the room left.
+function syncWindowHeight() {
+  if (!window.usageApi || !window.usageApi.setPanelHeight) return;
+  requestAnimationFrame(() => {
+    const settingsView = document.getElementById("settingsView");
+    if (settingsView && !settingsView.classList.contains("hidden")) {
+      // The settings overlay is absolute (inset:0), so it doesn't add to the
+      // panel's own height — measure its content directly.
+      window.usageApi.setPanelHeight(settingsView.scrollHeight);
+      return;
+    }
+    const panel = document.querySelector(".panel");
+    const models = document.querySelector(".models");
+    if (models) models.style.maxHeight = "none"; // measure natural height first
+    let target = panel.offsetHeight;
+    if (models && target > PANEL_MAX_HEIGHT) {
+      const chrome = target - models.offsetHeight; // everything except the table
+      const modelsHeight = Math.max(MODELS_MIN_HEIGHT, PANEL_MAX_HEIGHT - chrome);
+      models.style.maxHeight = `${modelsHeight}px`;
+      target = chrome + modelsHeight; // usually PANEL_MAX_HEIGHT; a bit more if chrome is tall
+    }
+    window.usageApi.setPanelHeight(target);
+  });
+}
+
 function pctClass(percent) {
   if (percent == null) return "";
   if (percent >= 90) return "danger";
@@ -114,15 +176,30 @@ function makeTodaySection(costUsd, tokens) {
 }
 
 /**
- * Daily cost chart. Each day is { date, costUsd, parts } where parts is
+ * Cost chart. Each bucket is { date, costUsd, parts, models } where parts is
  * [{ name, color, costUsd }] — one segment per provider, so the combined
- * view shows a stacked bar in each provider's color.
+ * view shows a stacked bar in each provider's color — and models is
+ * [{ model, costUsd }], the per-model cost breakdown for that bucket (shown
+ * on hover; falls back to the per-provider breakdown when no model data is
+ * available, e.g. JetBrains AI). `granularity` picks between daily buckets
+ * (7-day view, date is a YYYY-MM-DD key) and hourly buckets (24h view, date
+ * is a full ISO timestamp).
  */
-function buildChart(days) {
-  const chart = el("section", "chart");
+function buildChart(days, granularity = "day") {
+  const isHourly = granularity === "hour";
+  // Two aligned rows: the bars on top, then the axis labels underneath (a
+  // separate row, so labels sit below the chart rather than inside it). Both
+  // rows use the same equal-flex column layout so labels line up under bars.
+  const chart = el("section", isHourly ? "chart hourly" : "chart");
+  const barsRow = el("div", "chart-bars");
+  const labelsRow = el("div", "chart-labels");
   const maxCost = Math.max(0.01, ...days.map((d) => d.costUsd));
-  for (const d of days) {
-    const wrap = el("div", "chart-bar-wrap");
+  days.forEach((d, i) => {
+    // The track is the full-height column slot (equal for every bucket); the
+    // bar is the colored fill that rises from the bottom by cost. In the
+    // hourly view the track is tinted so all 24 equal slots are visible even
+    // for empty hours.
+    const track = el("div", "chart-track");
     const bar = el("div", "chart-bar");
     const pct = Math.max(2, Math.round((d.costUsd / maxCost) * 100));
     bar.style.height = `${pct}%`;
@@ -133,19 +210,31 @@ function buildChart(days) {
       seg.style.background = p.color || FALLBACK_CHART_COLOR;
       bar.appendChild(seg);
     }
-    const lines = [`${d.date}: ${fmtUsd(d.costUsd)}`];
-    if (parts.length > 1) lines.push(...parts.map((p) => `${p.name}: ${fmtUsd(p.costUsd)}`));
-    bar.title = lines.join("\n");
-    const label = el("div", "chart-day", d.date.slice(5)); // MM-DD
-    wrap.append(bar, label);
-    chart.appendChild(wrap);
-  }
+    track.appendChild(bar);
+    const isHour = granularity === "hour";
+    const dateObj = isHour ? new Date(d.date) : null;
+    const tooltipDate = isHour ? dateObj.toLocaleString(window.i18n.locale(currentLang)) : d.date;
+    const lines = [`${tooltipDate}: ${fmtUsd(d.costUsd)}`];
+    const models = (d.models || []).filter((m) => m.costUsd > 0);
+    if (models.length > 0) lines.push(...models.map((m) => `${m.model}: ${fmtUsd(m.costUsd)}`));
+    else if (parts.length > 1) lines.push(...parts.map((p) => `${p.name}: ${fmtUsd(p.costUsd)}`));
+    track.title = lines.join("\n"); // hover the whole column, not just the thin fill
+    barsRow.appendChild(track);
+
+    // Hourly view: label only every 4th slot (24 labels would be too cramped).
+    const labelText = isHour
+      ? i % 4 === 0
+        ? `${String(dateObj.getHours()).padStart(2, "0")}:00`
+        : ""
+      : d.date.slice(5); // MM-DD
+    labelsRow.appendChild(el("div", "chart-label-cell", labelText));
+  });
+  chart.append(barsRow, labelsRow);
   return chart;
 }
 
 function buildModelsTable(byModel) {
   const models = el("section", "models");
-  models.appendChild(el("div", "models-subtitle", strings.modelsSubtitle));
   const table = document.createElement("table");
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
@@ -169,6 +258,78 @@ function buildModelsTable(byModel) {
   table.append(thead, tbody);
   models.appendChild(table);
   return models;
+}
+
+/**
+ * Wraps `contentEl` in a centered header button (with a chevron) that toggles
+ * its visibility. `key` identifies the section for persisting collapsed state
+ * across re-renders and app restarts. Everything that belongs to the section —
+ * including its own controls, like the range <select> — lives inside
+ * `contentEl` so it only shows while expanded.
+ */
+function makeCollapsible(key, title, contentEl) {
+  const wrap = el("section", "collapsible");
+  const collapsed = !!collapsedSections[key];
+  wrap.classList.toggle("collapsed", collapsed);
+
+  const header = el("div", "collapsible-header");
+  const titleRow = el("div", "collapsible-title-row");
+  titleRow.append(el("span", "collapsible-chevron", "▾"), el("span", null, title));
+  header.appendChild(titleRow);
+  header.addEventListener("click", () => {
+    collapsedSections[key] = !collapsedSections[key];
+    wrap.classList.toggle("collapsed", collapsedSections[key]);
+    saveJson("krisvid-collapsed-sections", collapsedSections);
+    syncWindowHeight(); // window shrinks when collapsed, grows when expanded
+  });
+
+  const body = el("div", "collapsible-body");
+  body.appendChild(contentEl);
+  wrap.append(header, body);
+  return wrap;
+}
+
+/**
+ * The today-cost + chart + models-table block, with a range <select> (7 days
+ * / 24 hours) that swaps the chart and table at once (today's total is
+ * range-independent, it's always "today"). `ranges` is { "7d": { days,
+ * byModel }, "24h": { days, byModel } }.
+ */
+function buildStatsSection(todayCostUsd, todayTokens, ranges) {
+  const select = document.createElement("select");
+  select.className = "range-select";
+  for (const [value, label] of [
+    ["7d", strings.rangeLast7Days],
+    ["24h", strings.rangeLast24Hours],
+  ]) {
+    const opt = el("option", null, label);
+    opt.value = value;
+    select.appendChild(opt);
+  }
+  select.value = statsRange;
+
+  const statsBody = el("div");
+  const renderStatsBody = () => {
+    const r = ranges[statsRange] || ranges["7d"];
+    statsBody.replaceChildren(buildChart(r.days, statsRange === "24h" ? "hour" : "day"), buildModelsTable(r.byModel));
+  };
+  renderStatsBody();
+  select.addEventListener("change", () => {
+    statsRange = select.value;
+    saveJson("krisvid-stats-range", statsRange);
+    renderStatsBody();
+    syncWindowHeight(); // row count differs between ranges → height may change
+  });
+
+  // The range select belongs to the Details section, so it lives inside the
+  // body (right-aligned above the content) and only shows while expanded.
+  const selectRow = el("div", "range-select-row");
+  selectRow.appendChild(select);
+
+  const body = el("div");
+  body.append(selectRow, makeTodaySection(todayCostUsd, todayTokens), statsBody);
+
+  return makeCollapsible("stats", strings.statsTitle, body);
 }
 
 /** Single-provider view: full gauges + that provider's own stats. */
@@ -212,13 +373,13 @@ function renderProviderBlock(data) {
   }
   root.appendChild(gauges);
 
-  root.appendChild(makeTodaySection(local ? local.today.costUsd : 0, local ? local.today.tokens : 0));
-  const chartDays = (local ? local.last7Days : []).map((d) => ({
-    ...d,
-    parts: [{ name: data.name, color: data.color, costUsd: d.costUsd }],
-  }));
-  root.appendChild(buildChart(chartDays));
-  root.appendChild(buildModelsTable(local ? local.byModel : []));
+  const toParts = (d) => ({ ...d, parts: [{ name: data.name, color: data.color, costUsd: d.costUsd }] });
+  root.appendChild(
+    buildStatsSection(local ? local.today.costUsd : 0, local ? local.today.tokens : 0, {
+      "7d": { days: (local ? local.last7Days : []).map(toParts), byModel: local ? local.byModel : [] },
+      "24h": { days: (local ? local.last24Hours : []).map(toParts), byModel: local ? local.byModel24h : [] },
+    })
+  );
   root.appendChild(makeAccountBlock(account));
   return root;
 }
@@ -255,7 +416,16 @@ function renderAggregate(providers, ids) {
   let todayCost = 0;
   let todayTokens = 0;
   const byDay = new Map(); // date -> [{ name, color, costUsd }]
+  const byDayModel = new Map(); // date -> Map(model -> costUsd), merged across providers
+  const byHour = new Map(); // hour bucket -> [{ name, color, costUsd }]
+  const byHourModel = new Map(); // hour bucket -> Map(model -> costUsd), merged across providers
   const byModel = [];
+  const byModel24h = [];
+  const mergeModels = (bucketModelMap, date, models) => {
+    if (!bucketModelMap.has(date)) bucketModelMap.set(date, new Map());
+    const m = bucketModelMap.get(date);
+    for (const entry of models || []) m.set(entry.model, (m.get(entry.model) || 0) + entry.costUsd);
+  };
   for (const id of ids) {
     const p = providers[id];
     const local = p.local;
@@ -265,20 +435,35 @@ function renderAggregate(providers, ids) {
     for (const d of local.last7Days) {
       if (!byDay.has(d.date)) byDay.set(d.date, []);
       byDay.get(d.date).push({ name: p.name, color: p.color, costUsd: d.costUsd });
+      mergeModels(byDayModel, d.date, d.models);
+    }
+    for (const d of local.last24Hours) {
+      if (!byHour.has(d.date)) byHour.set(d.date, []);
+      byHour.get(d.date).push({ name: p.name, color: p.color, costUsd: d.costUsd });
+      mergeModels(byHourModel, d.date, d.models);
     }
     byModel.push(...local.byModel);
+    byModel24h.push(...local.byModel24h);
   }
 
-  root.appendChild(makeTodaySection(todayCost, todayTokens));
-  const chartDays = [...byDay.entries()]
-    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-    .map(([date, parts]) => ({
-      date,
-      costUsd: parts.reduce((sum, p) => sum + p.costUsd, 0),
-      parts,
-    }));
-  root.appendChild(buildChart(chartDays));
-  root.appendChild(buildModelsTable(byModel));
+  const toChartDays = (byBucket, byBucketModel) =>
+    [...byBucket.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, parts]) => ({
+        date,
+        costUsd: parts.reduce((sum, p) => sum + p.costUsd, 0),
+        parts,
+        models: [...(byBucketModel.get(date) || new Map()).entries()]
+          .filter(([, costUsd]) => costUsd > 0)
+          .sort((a, b) => b[1] - a[1])
+          .map(([model, costUsd]) => ({ model, costUsd })),
+      }));
+  root.appendChild(
+    buildStatsSection(todayCost, todayTokens, {
+      "7d": { days: toChartDays(byDay, byDayModel), byModel },
+      "24h": { days: toChartDays(byHour, byHourModel), byModel: byModel24h },
+    })
+  );
   return root;
 }
 
@@ -328,6 +513,8 @@ function render(snapshot) {
   } else {
     status.textContent = strings.loading;
   }
+
+  syncWindowHeight(); // provider count / row count changes affect content height
 }
 
 function applyStaticStrings() {
@@ -396,10 +583,12 @@ function openSettings() {
   document.getElementById("intervalSelect").value = String(currentPollIntervalMin);
   document.getElementById("alwaysOnTopCheckbox").checked = alwaysOnTop;
   document.getElementById("settingsView").classList.remove("hidden");
+  syncWindowHeight(); // settings content may be taller than the main view
 }
 
 function closeSettings() {
   document.getElementById("settingsView").classList.add("hidden");
+  syncWindowHeight(); // back to the (usually shorter) main view
 }
 
 document.getElementById("settingsBtn").addEventListener("click", openSettings);
@@ -482,4 +671,5 @@ window.usageApi.onUpdate((snapshot) => {
 
   appVersion = await window.usageApi.getVersion();
   document.getElementById("aboutVersionLine").textContent = strings.versionLabel(appVersion);
+  syncWindowHeight(); // size the window even if the first snapshot isn't in yet
 })();
