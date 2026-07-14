@@ -4,7 +4,7 @@ Krisvid is a lightweight Windows, macOS, and Linux tray app that monitors AI cod
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue) ![node](https://img.shields.io/badge/node-%3E%3D18-green) ![license](https://img.shields.io/badge/license-ISC-lightgrey)
 
-Repository: <https://github.com/zsoltjanes/KRISVID-AI-Usage-Monitor>
+Repository: <https://github.com/zsoltjanes/Krisvid-AI-Usage-Monitor>
 
 ![Krisvid application screenshot](resources/screenshot_1.png)
 
