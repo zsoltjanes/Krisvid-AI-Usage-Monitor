@@ -4,6 +4,7 @@
 const PRICING = [
   { match: /^claude-fable-5/, input: 10, output: 50 },
   { match: /^claude-mythos-5/, input: 10, output: 50 },
+  { match: /^claude-opus-5/, input: 5, output: 25 },
   { match: /^claude-opus-4/, input: 5, output: 25 },
   { match: /^claude-sonnet-5/, input: 3, output: 15 },
   { match: /^claude-sonnet-4/, input: 3, output: 15 },
