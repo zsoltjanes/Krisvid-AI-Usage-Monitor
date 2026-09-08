@@ -4,16 +4,21 @@
 // cachedInput is an absolute rate (not a multiplier). The -pro models have no
 // cached-input discount, so their cachedInput equals the input rate.
 const PRICING = [
+  { match: /^gpt-5\.6-sol/, input: 4, cachedInput: 0.4, output: 20 },
+  { match: /^gpt-5\.6-terra/, input: 2, cachedInput: 0.2, output: 12 },
+  { match: /^gpt-5\.6-luna/, input: 0.2, cachedInput: 0.02, output: 1.2 },
   { match: /^gpt-5\.5-pro/, input: 30, cachedInput: 30, output: 180 },
   { match: /^gpt-5\.5/, input: 5, cachedInput: 0.5, output: 30 },
   { match: /^gpt-5\.4-mini/, input: 0.75, cachedInput: 0.075, output: 4.5 },
   { match: /^gpt-5\.4-nano/, input: 0.2, cachedInput: 0.02, output: 1.25 },
   { match: /^gpt-5\.4-pro/, input: 30, cachedInput: 30, output: 180 },
   { match: /^gpt-5\.4/, input: 2.5, cachedInput: 0.25, output: 15 },
+  { match: /^gpt-5\.2-pro/, input: 21, cachedInput: 21, output: 168 },
+  { match: /^gpt-5\.2/, input: 1.75, cachedInput: 0.175, output: 14 },
+  { match: /^gpt-5-pro/, input: 15, cachedInput: 15, output: 120 },
   { match: /^gpt-5-mini/, input: 0.25, cachedInput: 0.025, output: 2 },
   { match: /^gpt-5-nano/, input: 0.05, cachedInput: 0.005, output: 0.4 },
-  // gpt-5, gpt-5.1 and their -codex variants (no longer on the pricing page,
-  // last published rates)
+  // gpt-5, gpt-5.1 and their -codex variants (same published rates)
   { match: /^gpt-5/, input: 1.25, cachedInput: 0.125, output: 10 },
 ];
 
