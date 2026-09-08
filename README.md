@@ -51,8 +51,8 @@ Download the matching artifact from [Releases](../../releases):
 Alternatively, run it from source on any supported operating system:
 
 ```sh
-git clone https://github.com/zsoltjanes/KRISVID-AI-Usage-Monitor.git
-cd KRISVID-AI-Usage-Monitor
+git clone https://github.com/zsoltjanes/Krisvid-AI-Usage-Monitor.git
+cd Krisvid-AI-Usage-Monitor
 npm install
 npm start
 ```
