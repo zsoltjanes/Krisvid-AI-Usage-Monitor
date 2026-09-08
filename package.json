@@ -1,6 +1,6 @@
 {
   "name": "krisvid-ai-usage-monitor",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Krisvid — AI usage tray monitor",
   "main": "src/main.js",
   "scripts": {
